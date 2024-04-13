@@ -3,16 +3,40 @@
 
 #include <stddef.h>
 
-typedef int (*CmdCbFn)(void *self);
+typedef struct CmdArg CmdArg;
+
+#define DEFAULT_PARSE_INFO (CmdArgParseInfo){.beginSign = 0, .endSign = 0}
+typedef struct {
+    int beginSign;
+    int endSign;
+    int (*parser)(CmdArg *arg, const char *token);
+} CmdArgParseInfo;
+
+struct CmdArg {
+    const char *name;
+    CmdArgParseInfo parseInfo;
+    union {
+        const char *asStr;
+        int asInt;
+    } value;
+};
+
+#define cmdArgList(...) \
+    (CmdArgList){ \
+        .len = sizeof((CmdArg[]){__VA_ARGS__}) / sizeof(CmdArg), \
+        .items = (CmdArg[]){__VA_ARGS__} \
+    }
+typedef struct {
+    size_t len;
+    CmdArg *items;
+} CmdArgList;
+
+typedef int (*CmdCbFn)(void *self, CmdArgList argList);
 typedef struct {
     void *ctx;
     CmdCbFn run;
+    CmdArgList argList;
 } CmdCb;
-
-#define CMD_CB(cb) (_Generic((cb), \
-    char *: (CmdCb){(cb), (CmdCbFn)cmd_cb_printer_run}, \
-    CmdCbWithArgs *: (CmdCb){(cb), (CmdCbFn)cmd_cb_with_args_run}, \
-    default: (CmdCb){NULL, (CmdCbFn)NULL}))
 
 typedef struct {
     const char *name;
@@ -20,38 +44,44 @@ typedef struct {
     CmdCb callback;
 } Cmd;
 
-Cmd *cmd_init(Cmd snip);
-int cmd_run(Cmd *self);
+int cmdNoneCallback(void *self, CmdArgList list);
+#define cmdSimple (Cmd){.desc = "none", .callback = (CmdCb){.ctx = NULL, .run = cmdNoneCallback}}
 
-int   cmd_cb_printer_run(const char *msg);
+int cmdRun(Cmd *cmd);
 
-typedef struct CmdArg CmdArg;
-typedef void (*CmdArgParser)(CmdArg *arg, const char *ctx);
+int CMD_ARG_STR_PARSER(CmdArg *arg, const char *ctx);
+int CMD_ARG_INT_PARSER(CmdArg *arg, const char *ctx);
 
-int cmd_strarg_parser(CmdArg *arg, const char *ctx);
-int cmd_intarg_parser(CmdArg *arg, const char *ctx);
+#define cmdCbPrintCb(msg) (CmdCb) {.ctx = (msg), .run = (CmdCbFn)cmdCbPrintCbRun}
+int cmdCbPrintCbRun(const char *msg, CmdArgList argList);
 
-struct CmdArg {
-    const char *name;
-    CmdArgParser parser;
-    union {
-        const char *as_str;
-        int as_int;
-    };
-};
+//////////////////////////////////////////////////////
+///Cmd line
+//////////////////////////////////////////////////////
 
-#define CMD_ARG_LIST(args) \
-    (CmdArgList){sizeof((args)) / sizeof(CmdArg), (args)}
+#include <stdio.h>
+
+#define CMDLINE_CAP 100
+
+
 typedef struct {
     size_t len;
-    CmdArg *data;
-} CmdArgList;
+    Cmd *items;
+} CmdList;
 
-typedef struct CmdCbWithArgs {
-    CmdArgList arg_list;
-    void (*handler)(struct CmdCbWithArgs *self);
-} CmdCbWithArgs;
+typedef struct {
+    const char *reqMsg;
+    size_t historyCap;
+    CmdList cmdList;
+} CmdlineConfig;
 
-int cmd_cb_with_args_run(CmdCbWithArgs *self);
+typedef struct {
+    FILE *output;
+    CmdlineConfig config;
+} Cmdline;
+
+Cmd *cmdlineRequestCmd(Cmdline *self);
+
 
 #endif
+
