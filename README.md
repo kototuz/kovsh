@@ -10,5 +10,7 @@ TODO:
     - [x] Reimplement find functions in `c_parser.c`
     - [x] Change the code style
 - [ ] Implement lexer
-    - [ ] Choose a way to determine a token
+    - [x] Choose a way to determine a token
     - [ ] Implement Analyzer
+        - [x] Refactor the tokenize function
+        - [ ] Implement an idea of TokenSeq

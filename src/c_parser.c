@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <stdlib.h>
 
 
 static Cmd *find_cmd_by_name(CmdList cmd_list, char *data, size_t data_len) {
@@ -47,21 +48,6 @@ typedef struct {
     size_t data_len;
 } Token;
 
-typedef struct {
-    size_t len;
-    Token *items;
-} TokenSeq;
-
-typedef enum {
-    COND_RANGE,
-    COND_EQ,
-} CondType;
-
-typedef struct {
-    CondType type;
-} Cond;
-
-
 static Lexer lexer_new(char *data, size_t data_len) {
     return (Lexer) {
         .data = data,
@@ -73,6 +59,18 @@ static Lexer lexer_new(char *data, size_t data_len) {
 static void lexer_trim(Lexer *self) {
     while (*self->cursor == ' ') {
         self->cursor++;
+    }
+}
+
+static const char *lexer_token_type_to_string(TokenType token_type) {
+    switch (token_type) {
+        case TOKEN_SYMBOL: return "symbol";
+        case TOKEN_DELIM_BEG: return "delim_beg";
+        case TOKEN_DELIM_END: return "delim_end";
+        case TOKEN_DELIM_BEG_END: return "delim_beg_end";
+        case TOKEN_EQ: return "equal";
+        case TOKEN_END: return "end";
+        default: return "invalid";
     }
 }
 
@@ -104,7 +102,60 @@ static TokenType lexer_token_type(int letter) {
 }
 
 static bool is_symbol(int letter) {
-    return isalnum(letter);
+    return isalpha(letter);
+}
+
+typedef struct TokenNode {
+    Token val;
+    struct TokenNode *next;
+} TokenNode;
+
+typedef struct {
+    TokenNode *begin;
+    TokenNode *end;
+    size_t len;
+} TokenSeq;
+
+static TokenSeq lexer_tokenize(Lexer *self) {
+    TokenSeq result = {0};
+
+    TokenNode *token_node = &(TokenNode){0};
+    TokenNode **result_begin = &token_node->next;
+
+    TokenType token_type = lexer_token_type(*self->cursor);
+    lexer_trim(self);
+    while (token_type != TOKEN_END) {
+        token_node = token_node->next = malloc(sizeof *token_node);
+        if (token_node == NULL) {
+            fputs("[!] lexer_tokenize: could not allocate memory", stderr);
+            return result;
+        }
+
+        token_node->val = (Token) {
+            .type = token_type,
+            .data = self->cursor,
+            .data_len = 1,
+        };
+
+        if (token_type == TOKEN_SYMBOL) {
+            self->cursor++;
+            while (is_symbol(*self->cursor)) {
+                self->cursor++;
+                token_node->val.data_len++;
+            }
+        } else {
+            self->cursor++;
+        }
+
+        lexer_trim(self);
+        token_type = lexer_token_type(*self->cursor);
+        result.len++;
+    }
+
+    result.begin = *result_begin;
+    result.end = token_node;
+
+    return result;
 }
 
 static Token lexer_next_token(Lexer *self) {
@@ -129,21 +180,44 @@ static Token lexer_next_token(Lexer *self) {
     return token;
 }
 
+typedef enum {
+    ANALYZE_START,
+    ANALYZE_CMD_FOUND,
+    ANALYZE_ARG_FOUND,
+} AnalyzeState;
+
+typedef struct {
+    void *ptr;
+    AnalyzeState state;
+} Analyzer;
+
+static void analyzer_deter(Token *token, Analyzer analyzer) {
+}
+
+static void parse_tokens(Lexer *l) {
+    Analyzer analyzer = {.ptr = NULL, .state = ANALYZE_START};
+    Token token = lexer_next_token(l);
+    while (token.type != TOKEN_END) {
+        if (token.type == TOKEN_SYMBOL) {
+        }
+    }
+}
+
 int main(void) {
-    char *text = "     echo     msg  =  'Hello World'";
+    char *text = "    echo    msg   =   'Hello, world'";
     Lexer lexer = lexer_new(text, strlen(text));
 
-    Token token = lexer_next_token(&lexer);
-    while (token.type != TOKEN_END) {
-        for (size_t i = 0; i < token.data_len; i++) {
-            putchar(token.data[i]);
+    TokenSeq token_seq = lexer_tokenize(&lexer);
+
+    TokenNode *node = token_seq.begin;
+    for (size_t i = 0; i < token_seq.len; i++) {
+        for (size_t y = 0; y < node->val.data_len; y++) {
+            putchar(node->val.data[y]);
         }
-        putchar('\n');
-        
-        token = lexer_next_token(&lexer);
+        printf("\t[%s]\n", lexer_token_type_to_string(node->val.type));
+
+        node = node->next;
     }
-
-
 
     return 0;
 }
