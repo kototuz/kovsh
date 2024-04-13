@@ -2,6 +2,7 @@
 #define KOVSH_CMD_H
 
 #include <stddef.h>
+#include <stdbool.h>
 
 typedef struct CmdArg CmdArg;
 
@@ -63,7 +64,6 @@ int cmdCbPrintCbRun(const char *msg, CmdArgList argList);
 
 #define CMDLINE_CAP 100
 
-
 typedef struct {
     size_t len;
     Cmd *items;
@@ -82,6 +82,73 @@ typedef struct {
 
 Cmd *cmdlineRequestCmd(Cmdline *self);
 
+///////////////////////////////////////////////
+/// LEXER
+//////////////////////////////////////////////
+
+typedef struct {
+    char *data;
+    size_t data_len;
+    char *cursor;
+} Lexer;
+
+typedef enum {
+    TOKEN_DELIM_BEG,
+    TOKEN_DELIM_END,
+    TOKEN_DELIM_BEG_END,
+    TOKEN_SYMBOL,
+    TOKEN_EQ,
+    TOKEN_END,
+    TOKEN_INVALID,
+} TokenType;
+
+typedef struct {
+    TokenType type;
+    char *data;
+    size_t data_len;
+} Token;
+
+typedef struct TokenNode {
+    Token val;
+    struct TokenNode *next;
+} TokenNode;
+
+typedef struct {
+    TokenNode *begin;
+    TokenNode *end;
+    size_t len;
+} TokenSeq;
+
+Lexer lexer_new(char *data, size_t data_len);
+const char *lexer_token_type_to_string(TokenType token_type);
+TokenSeq lexer_tokenize(Lexer *self);
+
+/////////////////////////////////////
+/// RULE
+/////////////////////////////////////
+
+typedef struct {
+    TokenNode *current;
+    size_t count;
+    size_t max;
+} TokenCursor;
+
+typedef struct {
+    void *ptr;
+    bool (*is_valid)(void *self, TokenCursor *cursor);
+} Rule;
+
+typedef struct {
+    Rule *rules;
+    size_t len;
+} RuleArray;
+
+Rule rule_vaarg(Rule *rule);
+Rule rule_oneof(RuleArray *rule_arr);
+Rule rule_array(RuleArray *rule_arr);
+Rule rule_simple(TokenType token_type);
+
+bool syntax_is_valid(TokenSeq *token_seq, RuleArray *rule_arr);
 
 #endif
 
