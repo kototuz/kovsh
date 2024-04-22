@@ -14,3 +14,9 @@ TODO:
     - [x] Implement Analyzer
         - [x] Refactor the tokenize function
         - [x] Implement Rule
+    - [x] Implement Evaluator
+
+- [x] Refactor rules
+- [ ] Embed lua to setting up **Kovsh**
+- [ ] Make tests
+- [ ] Implement build system in *zig*

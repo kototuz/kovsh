@@ -52,7 +52,6 @@ int cmdRun(Cmd *cmd);
 
 int CMD_ARG_STR_PARSER(CmdArg *arg, const char *ctx);
 int CMD_ARG_INT_PARSER(CmdArg *arg, const char *ctx);
-
 #define cmdCbPrintCb(msg) (CmdCb) {.ctx = (msg), .run = (CmdCbFn)cmdCbPrintCbRun}
 int cmdCbPrintCbRun(const char *msg, CmdArgList argList);
 
@@ -148,7 +147,39 @@ Rule rule_oneof(RuleArray *rule_arr);
 Rule rule_array(RuleArray *rule_arr);
 Rule rule_simple(TokenType token_type);
 
+bool rule_is_valid(Rule *rule, TokenCursor *tc);
 bool syntax_is_valid(TokenSeq *token_seq, RuleArray *rule_arr);
 
-#endif
+/////////////////////////////////
+/// EVALUATOR
+/////////////////////////////////
 
+typedef struct {
+    char *begin;
+    size_t len;
+} StrSlice;
+
+typedef void *EvalResult;
+typedef EvalResult (*EvalFn)(EvalResult er, StrSlice ss);
+
+typedef struct Evaluator {
+    Rule inner_rule;
+    EvalResult result;
+    EvalFn eval_fn;
+    struct Evaluator *prev_eval;
+} Evaluator;
+
+StrSlice strslice_from_bounds(char *begin, char *end);
+
+Evaluator  eval_const(EvalResult const_result);
+Evaluator  eval_new(Evaluator *e, EvalFn eval_fn, Rule inner_rule);
+EvalResult eval_get(Evaluator *e);
+
+Rule eval_rule(Evaluator *e);
+
+// EVALUATE FUNCTIONS
+EvalResult eval_cmd(EvalResult cmdline, StrSlice cmd_name);
+EvalResult eval_cmd_arg(EvalResult cmd, StrSlice arg_name);
+EvalResult eval_cmd_arg_val(EvalResult cmd_arg, StrSlice val);
+
+#endif

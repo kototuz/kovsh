@@ -92,8 +92,12 @@ static bool rule_oneof_is_valid(RuleArray *rule_arr, TokenCursor *cursor) {
 
 static bool rule_array_is_valid(RuleArray *self, TokenCursor *cursor) {
     size_t arr_len = self->len;
+    Token *checkpoint = cursor->current;
     for (size_t i = 0; i < arr_len; i++) {
-        if (!rule_is_valid(&self->rules[i], cursor)) return false;
+        if (!rule_is_valid(&self->rules[i], cursor)) {
+            cursor->current = checkpoint;
+            return false;
+        }
     }
     
     return true;
