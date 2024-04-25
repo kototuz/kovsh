@@ -1,14 +1,36 @@
-CC := gcc
-CFLAGS := -Wall -Wextra -pedantic -O0 -std=c11 -g
-SRC := cmnd.c
+cc := gcc
+cflags := -Wall -Wextra -pedantic
 
-%.o: %.c
-	$(CC) $(CFLAGS) -o $@ -c $<
+bin := zig-out/bin
+objs := zig-out/objs
 
-%: %.o
-	ld -o $@ $<
-	./$@
-	rm $@
+kovsh_main := src/main.c
+kovsh_sources := $(wildcard src/**/*.c)
+kovsh_objects = $(subst src/, $(objs)/, $(kovsh_sources))
+kovsh_objects := $(kovsh_objects:.c=.o)
 
-cmnd_test: cmnd.o
-	$(CC) $(CFLAGS) -o test cmnd.o
+run_file := $(kovsh_main)
+run_file := $(patsubst %.c, %,$(subst src/, $(bin)/, $(run_file)))
+
+.PHONY: dirs run
+
+all: dirs $(kovsh_objects)
+	$(cc) $(cflags) -o $(bin)/kovsh $(kovsh_main) $(kovsh_objects)
+
+$(objs)/%.o: src/%.c
+	mkdir -p -v $(dir $@)
+	$(cc) $(cflags) -o $@ -c $<
+
+dirs:
+	mkdir -p src
+	mkdir -p zig-out/bin
+	mkdir -p zig-out/objs
+
+$(bin)/%: src/%.c $(kovsh_objects)
+	$(cc) $(flags) -o $(basename $@) $< $(kovsh_objects)
+
+run: $(run_file)
+	./$(basename $<)
+
+clean:
+	rm -rf $(bin)/* $(kovsh_objects)
