@@ -1,5 +1,5 @@
 cc := gcc
-cflags := -Wall -Wextra -pedantic
+cflags := -Wall -Wextra -pedantic -g
 
 bin := zig-out/bin
 objs := zig-out/objs
@@ -9,8 +9,7 @@ kovsh_sources := $(wildcard src/**/*.c)
 kovsh_objects = $(subst src/, $(objs)/, $(kovsh_sources))
 kovsh_objects := $(kovsh_objects:.c=.o)
 
-run_file := $(kovsh_main)
-run_file := $(patsubst %.c, %,$(subst src/, $(bin)/, $(run_file)))
+export run_file := $(kovsh_main)
 
 .PHONY: dirs run
 
@@ -27,10 +26,10 @@ dirs:
 	mkdir -p zig-out/objs
 
 $(bin)/%: src/%.c $(kovsh_objects)
-	$(cc) $(flags) -o $(basename $@) $< $(kovsh_objects)
+	$(cc) $(cflags) -o zig-out/bin/$(basename $(notdir $@)) $< $(kovsh_objects)
 
-run: $(run_file)
-	./$(basename $<)
+run: $(patsubst %.c, %,$(subst src/, $(bin)/, $(run_file)))
+	./zig-out/bin/$(basename $(notdir $<))
 
 clean:
 	rm -rf $(bin)/* $(kovsh_objects)

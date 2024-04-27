@@ -6,8 +6,6 @@
 static void token_cursor_next(TokenCursor *tc);
 static bool token_cursor_is_end(TokenCursor *tc);
 
-static bool rule_is_valid(Rule *rule, TokenCursor *tc);
-
 static bool rule_vaarg_is_valid(Rule *rule, TokenCursor *tc);
 static bool rule_oneof_is_valid(RuleArray *ra, TokenCursor *tc);
 static bool rule_array_is_valid(RuleArray *ra, TokenCursor *tc);
@@ -44,6 +42,10 @@ Rule rule_simple(TokenType token_type) {
     };
 }
 
+bool rule_is_valid(Rule *rule, TokenCursor *token_cursor) {
+    return rule->is_valid(rule->ptr, token_cursor);
+}
+
 bool syntax_is_valid(TokenSeq *token_seq, RuleArray *rule_arr) {
     TokenCursor token_cursor = {
         .current = token_seq->begin,
@@ -67,9 +69,6 @@ static bool token_cursor_is_end(TokenCursor *self) {
     return self->count >= self->max;
 }
 
-static bool rule_is_valid(Rule *rule, TokenCursor *token_cursor) {
-    return rule->is_valid(rule->ptr, token_cursor);
-}
 
 static bool rule_vaarg_is_valid(Rule *rule, TokenCursor *cursor) {
     while (rule_is_valid(rule, cursor) 
@@ -92,14 +91,14 @@ static bool rule_oneof_is_valid(RuleArray *rule_arr, TokenCursor *cursor) {
 
 static bool rule_array_is_valid(RuleArray *self, TokenCursor *cursor) {
     size_t arr_len = self->len;
-    Token *checkpoint = cursor->current;
+    TokenNode *checkpoint = cursor->current;
     for (size_t i = 0; i < arr_len; i++) {
         if (!rule_is_valid(&self->rules[i], cursor)) {
             cursor->current = checkpoint;
             return false;
         }
     }
-    
+
     return true;
 }
 
