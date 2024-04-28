@@ -5,7 +5,7 @@ bin := zig-out/bin
 objs := zig-out/objs
 
 kovsh_main := src/main.c
-kovsh_sources := $(wildcard src/**/*.c)
+kovsh_sources := $(wildcard src/*.c)
 kovsh_objects = $(subst src/, $(objs)/, $(kovsh_sources))
 kovsh_objects := $(kovsh_objects:.c=.o)
 
