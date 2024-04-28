@@ -12,6 +12,7 @@ typedef struct {
 
 StrSlice strslice_from_bounds(char *begin, char *end);
 void strslice_new(StrSlice *ss, size_t len, char items[*]);
+void strslice_print(StrSlice s);
 
 ///////////////////////////////////////////////
 /// LEXER
@@ -29,7 +30,9 @@ typedef enum {
     TOKEN_TYPE_NUMBER,
     TOKEN_TYPE_BOOL,
     TOKEN_TYPE_EQ,
+
     TOKEN_TYPE_END,
+    TOKEN_TYPE_ENUM_END
 } TokenType;
 
 typedef struct {
@@ -37,97 +40,52 @@ typedef struct {
     StrSlice text;
 } Token;
 
-typedef struct TokenNode {
-    Token val;
-    struct TokenNode *next;
-} TokenNode;
-
 typedef struct {
-    TokenNode *begin;
-    TokenNode *end;
     size_t len;
+    Token *items;
 } TokenSeq;
 
+typedef enum {
+    CONTEXT_USE_CMD_CALL,
+    CONTEXT_USE_ARG_ASSIGN,
+} ContextUse;
+
+typedef struct ContextEntry {
+    TokenSeq ts;
+    ContextUse ctx_use;
+    struct ContextEntry *next;
+} ContextEntry;
+
+typedef struct {
+    size_t entries_len;
+    ContextEntry *first;
+    ContextEntry *last;
+} Context;
+
+typedef struct {
+    Context context;
+    ContextEntry *cursor;
+} ContextIter;
+
 Lexer lexer_new(StrSlice ss);
+
 const char *lexer_token_type_to_string(TokenType token_type);
-TokenSeq lexer_tokenize(Lexer *self);
-Token lexer_token_next(Lexer *l);
 void lexer_inc(Lexer *l, size_t inc);
-void lexer_expect_token_next(Lexer *l, TokenType expect);
 
-/////////////////////////////////////
-/// RULE
-/////////////////////////////////////
+Token lexer_token_next_expect(Lexer *l, TokenType expect);
+Token lexer_token_next(Lexer *l);
+bool  lexer_token_next_is(Lexer *l, TokenType t);
 
-typedef struct {
-    TokenNode *current;
-    size_t count;
-    size_t max;
-} TokenCursor;
+TokenSeq lexer_token_seq_from_lexer(Lexer *l, size_t count);
 
-typedef struct {
-    void *ptr;
-    bool (*is_valid)(void *self, TokenCursor *cursor);
-} Rule;
+void lexer_parse_to_context(Lexer *l, Context *context);
+void lexer_context_write(Context *context, ContextEntry *ce);
+void lexer_context_delete(Context *context);
+Context lexer_context_new(void);
 
-typedef struct {
-    Rule *rules;
-    size_t len;
-} RuleArray;
+ContextEntry *lexer_context_entry_create(TokenSeq ts, ContextUse ctx_use);
+const char *lexer_context_use_to_str(ContextUse ctx_use);
 
-Rule rule_vaarg(Rule *rule);
-Rule rule_oneof(RuleArray *rule_arr);
-Rule rule_array(RuleArray *rule_arr);
-Rule rule_simple(TokenType token_type);
-
-bool rule_is_valid(Rule *rule, TokenCursor *tc);
-bool syntax_is_valid(TokenSeq *token_seq, RuleArray *rule_arr);
-
-/////////////////////////////////
-/// EVALUATOR
-/////////////////////////////////
-
-typedef void *EvalResult;
-typedef EvalResult (*EvalFn)(EvalResult er, StrSlice ss);
-
-typedef struct Evaluator {
-    Rule inner_rule;
-    EvalResult result;
-    EvalFn eval_fn;
-    struct Evaluator *prev_eval;
-} Evaluator;
-
-
-Evaluator  eval_const(EvalResult const_result);
-Evaluator  eval_new(Evaluator *e, EvalFn eval_fn, Rule inner_rule);
-EvalResult eval_get(Evaluator *e);
-
-Rule eval_rule(Evaluator *e);
-
-// EVALUATE FUNCTIONS
-EvalResult eval_cmd(EvalResult cmdline, StrSlice cmd_name);
-EvalResult eval_cmd_arg(EvalResult cmd, StrSlice arg_name);
-EvalResult eval_cmd_arg_val(EvalResult cmd_arg, StrSlice val);
-
-
-//////////////////////////////
-/// EXPRESSION
-//////////////////////////////
-
-typedef union {
-    StrSlice as_str;
-    int as_int;
-} ExprResult;
-
-typedef ExprResult (*ExprEvalFn)(void *self);
-
-typedef struct {
-    void *ptr;
-    ExprEvalFn fn;
-} Expr;
-
-
-void expr_parse(TokenCursor *token_cursor);
-
+bool lexer_context_iter_next(ContextIter *ctx_iter, ContextEntry **output);
 
 #endif
