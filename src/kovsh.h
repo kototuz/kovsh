@@ -72,7 +72,7 @@ Lexer ksh_lexer_new(StrSlice ss);
 const char *ksh_lexer_token_type_to_string(TokenType token_type);
 void ksh_lexer_inc(Lexer *l, size_t inc);
 
-Token ksh_lexer_expect_next_token(Lexer *l, TokenType expect);
+Token ksh_lexer_expect_token_next(Lexer *l, TokenType expect);
 Token ksh_lexer_token_next(Lexer *l);
 bool  ksh_lexer_is_token_next(Lexer *l, TokenType t);
 

@@ -43,16 +43,16 @@ const StrSlice BOOL_FALSE_KEYWORD = { .items = "false", .len = 5 };
 static void lexer_trim(Lexer *l);
 static bool is_lit(int letter);
 static bool lexer_at_keyword(Lexer *l, StrSlice keyword);
-static bool lexer_token_seq_next_is(Lexer *l, struct TokenTypeSeq tts);
+static bool ksh_token_seq_is_next(Lexer *l, struct TokenTypeSeq tts);
 
 
 // PUBLIC FUNCTIONS
-Lexer lexer_new(StrSlice ss)
+Lexer ksh_lexer_new(StrSlice ss)
 {
     return (Lexer) { .text = ss };
 }
 
-const char *lexer_token_type_to_string(TokenType token_type)
+const char *ksh_lexer_token_type_to_string(TokenType token_type)
 {
     switch (token_type) {
     case TOKEN_TYPE_LIT: return "literal";
@@ -65,7 +65,8 @@ const char *lexer_token_type_to_string(TokenType token_type)
     }
 }
 
-Token lexer_token_next(Lexer *l)
+
+Token ksh_lexer_token_next(Lexer *l)
 {
     Token result = {0};
 
@@ -137,49 +138,33 @@ Token lexer_token_next(Lexer *l)
     return result;
 }
 
-void lexer_inc(Lexer *l, size_t inc)
+void ksh_lexer_inc(Lexer *l, size_t inc)
 {
     l->cur_letter = l->text.items[(l->cursor += inc)];
 }
 
-Token lexer_token_next_expect(Lexer *l, TokenType expect)
+Token ksh_lexer_expect_token_next(Lexer *l, TokenType expect)
 {
-    Token t = lexer_token_next(l);
+    Token t = ksh_lexer_token_next(l);
     if (t.type != expect) {
         fprintf(stderr, "ERROR: %s was expected, but %s is occured\n",
-               lexer_token_type_to_string(expect),
-               lexer_token_type_to_string(t.type));
+               ksh_lexer_token_type_to_string(expect),
+               ksh_lexer_token_type_to_string(t.type));
         exit(1);
     }
 
     return t;
 }
 
-bool lexer_token_next_is(Lexer *l, TokenType t)
+bool ksh_lexer_is_token_next(Lexer *l, TokenType t)
 {
     size_t checkpoint = l->cursor;
-    Token token = lexer_token_next(l);
+    Token token = ksh_lexer_token_next(l);
     l->cursor = checkpoint;
     return token.type == t;
 }
 
-bool lexer_token_seq_next_is(Lexer *l, struct TokenTypeSeq tts)
-{
-    bool result = true;;
-    size_t checkpoint = l->cursor;
-    for (size_t i = 0; i < tts.len; i++) {
-        Token token = lexer_token_next(l);
-        if (token.type != tts.items[i]) {
-            result = false;
-            break;
-        }
-    }
-
-    l->cursor = checkpoint;
-    return result;
-}
-
-TokenSeq lexer_token_seq_from_lexer(Lexer *l, size_t count)
+TokenSeq ksh_token_seq_from_lexer(Lexer *l, size_t count)
 {
     TokenSeq result = {
         .items = (Token *)malloc(sizeof(Token) * count),
@@ -192,7 +177,7 @@ TokenSeq lexer_token_seq_from_lexer(Lexer *l, size_t count)
     }
 
     for (size_t i = 0; i < count; i++) {
-        Token token = lexer_token_next(l);
+        Token token = ksh_lexer_token_next(l);
         if (token.type == TOKEN_TYPE_END) {
             fprintf(stderr, "ERROR: could not get %zu tokens: tokens are over", count);
             exit(1);
@@ -203,7 +188,7 @@ TokenSeq lexer_token_seq_from_lexer(Lexer *l, size_t count)
     return result;
 }
 
-void lexer_context_delete(Context *context)
+void ksh_context_delete(Context *context)
 {
     ContextEntry *tmp;
     ContextEntry *it = context->first;
@@ -214,12 +199,12 @@ void lexer_context_delete(Context *context)
     }
 }
 
-Context lexer_context_new(void)
+Context ksh_context_new(void)
 {
     return (Context) { .first = NULL, .last = NULL };
 }
 
-ContextEntry *lexer_context_entry_create(TokenSeq seq, ContextUse ctx_use) {
+ContextEntry *ksh_context_entry_create(TokenSeq seq, ContextUse ctx_use) {
     ContextEntry *result = (ContextEntry *)malloc(sizeof(ContextEntry));
     if (!result) {
         fputs("ERROR: could not allocate memmory for `ContextEntry`\n", stderr);
@@ -235,7 +220,7 @@ ContextEntry *lexer_context_entry_create(TokenSeq seq, ContextUse ctx_use) {
     return result;
 }
 
-void lexer_context_write(Context *context, ContextEntry *ce)
+void ksh_context_write(Context *context, ContextEntry *ce)
 {
     if (context->first == NULL) {
         context->first = context->last = ce;
@@ -245,14 +230,14 @@ void lexer_context_write(Context *context, ContextEntry *ce)
     context->entries_len++;
 }
 
-void lexer_parse_to_context(Lexer *l, Context *context)
+void ksh_lexer_parse_to_context(Lexer *l, Context *context)
 {
     for (size_t i = 0; i < TOKEN_TYPE_SEQS_LEN;) {
         struct TokenTypeSeq seq = token_type_seqs[i];
-        if (lexer_token_seq_next_is(l, seq)) {
-            TokenSeq token_seq = lexer_token_seq_from_lexer(l, seq.len);
-            ContextEntry *ctx_entry = lexer_context_entry_create(token_seq, seq.ctx_use);
-            lexer_context_write(context, ctx_entry);
+        if (ksh_token_seq_is_next(l, seq)) {
+            TokenSeq token_seq = ksh_token_seq_from_lexer(l, seq.len);
+            ContextEntry *ctx_entry = ksh_context_entry_create(token_seq, seq.ctx_use);
+            ksh_context_write(context, ctx_entry);
             i = 0;
             continue;
         }
@@ -260,7 +245,7 @@ void lexer_parse_to_context(Lexer *l, Context *context)
     }
 }
 
-const char *lexer_context_use_to_str(ContextUse ctx_use)
+const char *ksh_context_use_to_str(ContextUse ctx_use)
 {
     switch (ctx_use) {
         case CONTEXT_USE_CMD_CALL: return "cmd call";
@@ -269,7 +254,7 @@ const char *lexer_context_use_to_str(ContextUse ctx_use)
     }
 }
 
-bool lexer_context_iter_next(ContextIter *ctx_iter, ContextEntry **output)
+bool ksh_context_iter_next(ContextIter *ctx_iter, ContextEntry **output)
 {
     if (ctx_iter->cursor == NULL) {
         if (ctx_iter->context.first == NULL) return false;
@@ -289,39 +274,38 @@ int main(void)
     const char *text = "echo msg=\"Hello world\" rep=123";
     StrSlice ss = { .items = text, .len = strlen(text) };
 
-    Lexer lexer = lexer_new(ss);
+    Lexer lexer = ksh_lexer_new(ss);
 
-    Token token = lexer_token_next(&lexer);
+    Token token = ksh_lexer_token_next(&lexer);
     while (token.type != TOKEN_TYPE_END) {
         strslice_print(token.text);
-        printf(" -> %s\n", lexer_token_type_to_string(token.type));
+        printf(" -> %s\n", ksh_lexer_token_type_to_string(token.type));
 
-        token = lexer_token_next(&lexer);
+        token = ksh_lexer_token_next(&lexer);
     }
 
     putchar('\n');
 
     lexer.cursor = 0;
 
-    Context context = lexer_context_new();
-    lexer_parse_to_context(&lexer, &context);
+    Context context = ksh_context_new();
+    ksh_lexer_parse_to_context(&lexer, &context);
     ContextIter iter = { .context = context };
 
     printf("%zu\n", iter.context.entries_len);
 
     ContextEntry *entry;
-    while (lexer_context_iter_next(&iter, &entry)) {
+    while (ksh_context_iter_next(&iter, &entry)) {
         for (size_t i = 0; i < entry->ts.len; i++) {
             strslice_print(entry->ts.items[i].text);
-            printf(" -> %s\n" ,lexer_context_use_to_str(entry->ctx_use));
+            printf(" -> %s\n" , ksh_context_use_to_str(entry->ctx_use));
         }
     }
 }
 
 // PRIVATE FUNCTIONS
 static void lexer_trim(Lexer *self) {
-    while (self->text.items[self->cursor] == ' ') {
-        self->cursor++;
+    while (self->text.items[self->cursor] == ' ') { self->cursor++;
     }
 }
 
@@ -339,4 +323,20 @@ static bool lexer_at_keyword(Lexer *l, StrSlice ss)
     }
 
     return false;
+}
+
+static bool ksh_token_seq_is_next(Lexer *l, struct TokenTypeSeq tts)
+{
+    bool result = true;;
+    size_t checkpoint = l->cursor;
+    for (size_t i = 0; i < tts.len; i++) {
+        Token token = ksh_lexer_token_next(l);
+        if (token.type != tts.items[i]) {
+            result = false;
+            break;
+        }
+    }
+
+    l->cursor = checkpoint;
+    return result;
 }
