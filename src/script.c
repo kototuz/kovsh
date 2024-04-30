@@ -35,6 +35,25 @@ static const struct TokenTypeSeq {
     }
 };
 
+typedef Token (*LazyEvalFn)(Lexer *l);
+
+// EVALUATE FUNCTION DECLARATIONS
+static Token token_type_eq_eval(Lexer *l);
+static Token token_type_lit_eval(Lexer *l);
+static Token token_type_bool_eval(Lexer *l);
+static Token token_type_string_eval(Lexer *l);
+static Token token_type_number_eval(Lexer *l);
+static Token token_type_empty(Lexer *l);
+
+static const LazyEvalFn evaluate_functions[] = {
+    [TOKEN_TYPE_EQ] = token_type_eq_eval,
+    [TOKEN_TYPE_LIT] = token_type_lit_eval,
+    [TOKEN_TYPE_BOOL] = token_type_bool_eval,
+    [TOKEN_TYPE_STRING] = token_type_string_eval,
+    [TOKEN_TYPE_NUMBER] = token_type_number_eval,
+    [TOKEN_TYPE_END] = token_type_empty
+};
+
 // KEYWORDS
 const StrSlice BOOL_TRUE_KEYWORD = { .items = "true", .len = 4 };
 const StrSlice BOOL_FALSE_KEYWORD = { .items = "false", .len = 5 };
@@ -52,6 +71,47 @@ Lexer ksh_lexer_new(StrSlice ss)
     return (Lexer) { .text = ss };
 }
 
+LazyToken ksh_lexer_lazy_token_get(Lexer *l)
+{
+    lexer_trim(l);
+
+    LazyToken result = {0};
+
+    const int letter = l->text.items[l->cursor];
+    switch (letter) {
+    case '=':
+        result.type = TOKEN_TYPE_EQ;
+        break;
+    case '"':
+        result.type = TOKEN_TYPE_STRING;
+        break;
+    case '\0':
+        result.type = TOKEN_TYPE_END;
+        break;
+    default:
+        if (is_lit(letter)) {
+            result.type = TOKEN_TYPE_LIT;
+        } else if (isdigit(letter)) {
+            result.type = TOKEN_TYPE_NUMBER;
+        } else if (lexer_at_keyword(l, BOOL_TRUE_KEYWORD)
+                   || lexer_at_keyword(l, BOOL_FALSE_KEYWORD)) {
+            result.type = TOKEN_TYPE_BOOL;
+        } else {
+            assert(0 && "not yet implemented");
+        }
+        break;
+    }
+    result.l = l;
+
+    return result;
+}
+
+Token ksh_lazy_token_evaluate(LazyToken lt)
+{
+    assert(lt.type < TOKEN_TYPE_ENUM_END);
+    return evaluate_functions[lt.type](lt.l);
+}
+
 const char *ksh_lexer_token_type_to_string(TokenType token_type)
 {
     switch (token_type) {
@@ -65,78 +125,84 @@ const char *ksh_lexer_token_type_to_string(TokenType token_type)
     }
 }
 
-
 Token ksh_lexer_token_next(Lexer *l)
 {
-    Token result = {0};
-
-    lexer_trim(l);
-    size_t cursor = l->cursor;
-
-    int first_letter = l->text.items[cursor];
-    switch (first_letter) {
-        case '=':
-            result.type = TOKEN_TYPE_EQ;
-            result.text.items = &l->text.items[cursor++];
-            result.text.len = 1;
-            break;
-
-        case '"':
-            result.type = TOKEN_TYPE_STRING;
-            result.text.items = &l->text.items[++cursor];
-            while (l->text.items[cursor] != '"') {
-                if (l->text.items[cursor] == '\0') {
-                    fputs("ERROR: the closing quote was missed\n", stderr);
-                    exit(1);
-                }
-
-                result.text.len++;
-                cursor++;
-            }
-            cursor++;
-            break;
-
-        case '\0':
-            result.type = TOKEN_TYPE_END;
-            break;
-
-        default:
-            l->cursor = cursor;
-            if (lexer_at_keyword(l, BOOL_FALSE_KEYWORD)) {
-                result.type = TOKEN_TYPE_BOOL;
-                result.text = BOOL_FALSE_KEYWORD;
-
-                cursor += BOOL_FALSE_KEYWORD.len;
-            } else if (lexer_at_keyword(l, BOOL_TRUE_KEYWORD)) {
-                result.type = TOKEN_TYPE_BOOL;
-                result.text = BOOL_TRUE_KEYWORD;
-
-                cursor += BOOL_TRUE_KEYWORD.len;
-            } else if (isdigit(l->text.items[cursor])) {
-                result.type = TOKEN_TYPE_NUMBER;
-                result.text.items = &l->text.items[cursor++];
-                result.text.len = 1;
-                while (isdigit(l->text.items[cursor])) {
-                    cursor++;
-                    result.text.len++;
-                }
-            } else if (is_lit(l->text.items[cursor])) {
-                result.type = TOKEN_TYPE_LIT;
-                result.text.items = &l->text.items[cursor++];
-                result.text.len = 1;
-                while (is_lit(l->text.items[cursor])) {
-                    cursor++;
-                    result.text.len++;
-                }
-            }
-
-            break;
-    }
-
-    l->cursor = cursor;
-
-    return result;
+    Token token = ksh_lazy_token_evaluate(ksh_lexer_lazy_token_get(l));
+    ksh_lexer_inc(l, token.text.len);
+    return token;
 }
+
+// Token ksh_lexer_token_next(Lexer *l)
+// {
+//     Token result = {0};
+// 
+//     lexer_trim(l);
+//     size_t cursor = l->cursor;
+// 
+//     int first_letter = l->text.items[cursor];
+//     switch (first_letter) {
+//         case '=':
+//             result.type = TOKEN_TYPE_EQ;
+//             result.text.items = &l->text.items[cursor++];
+//             result.text.len = 1;
+//             break;
+// 
+//         case '"':
+//             result.type = TOKEN_TYPE_STRING;
+//             result.text.items = &l->text.items[++cursor];
+//             while (l->text.items[cursor] != '"') {
+//                 if (l->text.items[cursor] == '\0') {
+//                     fputs("ERROR: the closing quote was missed\n", stderr);
+//                     exit(1);
+//                 }
+// 
+//                 result.text.len++;
+//                 cursor++;
+//             }
+//             cursor++;
+//             break;
+// 
+//         case '\0':
+//             result.type = TOKEN_TYPE_END;
+//             break;
+// 
+//         default:
+//             l->cursor = cursor;
+//             if (lexer_at_keyword(l, BOOL_FALSE_KEYWORD)) {
+//                 result.type = TOKEN_TYPE_BOOL;
+//                 result.text = BOOL_FALSE_KEYWORD;
+// 
+//                 cursor += BOOL_FALSE_KEYWORD.len;
+//             } else if (lexer_at_keyword(l, BOOL_TRUE_KEYWORD)) {
+//                 result.type = TOKEN_TYPE_BOOL;
+//                 result.text = BOOL_TRUE_KEYWORD;
+// 
+//                 cursor += BOOL_TRUE_KEYWORD.len;
+//             } else if (isdigit(l->text.items[cursor])) {
+//                 result.type = TOKEN_TYPE_NUMBER;
+//                 result.text.items = &l->text.items[cursor++];
+//                 result.text.len = 1;
+//                 while (isdigit(l->text.items[cursor])) {
+//                     cursor++;
+//                     result.text.len++;
+//                 }
+//             } else if (is_lit(l->text.items[cursor])) {
+//                 result.type = TOKEN_TYPE_LIT;
+//                 result.text.items = &l->text.items[cursor++];
+//                 result.text.len = 1;
+//                 while (is_lit(l->text.items[cursor])) {
+//                     cursor++;
+//                     result.text.len++;
+//                 }
+//             }
+// 
+//             break;
+//     }
+// 
+//     l->cursor = cursor;
+// 
+//     return result;
+// }
 
 void ksh_lexer_inc(Lexer *l, size_t inc)
 {
@@ -145,23 +211,23 @@ void ksh_lexer_inc(Lexer *l, size_t inc)
 
 Token ksh_lexer_expect_token_next(Lexer *l, TokenType expect)
 {
-    Token t = ksh_lexer_token_next(l);
-    if (t.type != expect) {
+    LazyToken lt = ksh_lexer_lazy_token_get(l);
+    if (lt.type != expect) {
         fprintf(stderr, "ERROR: %s was expected, but %s is occured\n",
-               ksh_lexer_token_type_to_string(expect),
-               ksh_lexer_token_type_to_string(t.type));
+                ksh_lexer_token_type_to_string(expect),
+                ksh_lexer_token_type_to_string(lt.type));
         exit(1);
     }
 
-    return t;
+    Token ret = ksh_lazy_token_evaluate(lt);
+    ksh_lexer_inc(l, ret.text.len);
+    return ret;
 }
 
 bool ksh_lexer_is_token_next(Lexer *l, TokenType t)
 {
-    size_t checkpoint = l->cursor;
-    Token token = ksh_lexer_token_next(l);
-    l->cursor = checkpoint;
-    return token.type == t;
+    LazyToken lt = ksh_lexer_lazy_token_get(l);
+    return lt.type == t;
 }
 
 TokenSeq ksh_token_seq_from_lexer(Lexer *l, size_t count)
@@ -271,10 +337,12 @@ bool ksh_context_iter_next(ContextIter *ctx_iter, ContextEntry **output)
 
 int main(void)
 {
-    const char *text = "echo msg=\"Hello world\" rep=123";
+    const char *text = "echo msg=\"Hello world\"";
     StrSlice ss = { .items = text, .len = strlen(text) };
 
     Lexer lexer = ksh_lexer_new(ss);
+
+    printf("%d\n", ksh_lexer_is_token_next(&lexer, TOKEN_TYPE_STRING));
 
     Token token = ksh_lexer_token_next(&lexer);
     while (token.type != TOKEN_TYPE_END) {
@@ -339,4 +407,90 @@ static bool ksh_token_seq_is_next(Lexer *l, struct TokenTypeSeq tts)
 
     l->cursor = checkpoint;
     return result;
+}
+
+// EVALUATE FUNCTIONS
+static Token token_type_eq_eval(Lexer *l)
+{
+    assert(l->text.items[l->cursor] == '=');
+    return (Token){
+        .text = (StrSlice){ .items = (char[]){ '=' }, .len = 1 },
+        .type = TOKEN_TYPE_EQ
+    };
+}
+
+static Token token_type_lit_eval(Lexer *l)
+{
+    size_t cursor = l->cursor;
+    assert(is_lit(l->text.items[cursor]));
+    Token result = {
+        .text.items = &l->text.items[cursor++],
+        .text.len = 1,
+        .type = TOKEN_TYPE_LIT
+    };
+
+    while (is_lit(l->text.items[cursor])) {
+        result.text.len++;
+        cursor++;
+    }
+
+    return result;
+}
+
+static Token token_type_bool_eval(Lexer *l)
+{
+    size_t cursor = l->cursor;
+    return (Token) {
+        .text.items = &l->text.items[cursor],
+        .text.len = l->text.items[cursor+4] == ' ' ? 4 : 5,
+        .type = TOKEN_TYPE_BOOL
+    };
+}
+
+static Token token_type_string_eval(Lexer *l)
+{
+    size_t cursor = l->cursor;
+    assert(l->text.items[cursor] == '"');
+    
+    Token result = {
+        .text.items = &l->text.items[cursor++],
+        .text.len = 2,
+        .type = TOKEN_TYPE_STRING
+    };
+
+    while (l->text.items[cursor] != '"') {
+        if (l->text.items[cursor] == '\0') {
+            fputs("ERROR: the closing quote was missed\n", stderr);
+            exit(1);
+        }
+
+        result.text.len++;
+        cursor++;
+    }
+
+    return result;
+}
+
+static Token token_type_number_eval(Lexer *l)
+{
+    size_t cursor = l->cursor;
+    assert(isdigit(l->text.items[cursor]));
+    Token result = {
+        .text.items = &l->text.items[cursor],
+        .text.len = 1,
+        .type = TOKEN_TYPE_NUMBER
+    };
+
+    while (isdigit(l->text.items[cursor])) {
+        result.text.len++;
+        cursor++;
+    }
+
+    return result;
+}
+
+static Token token_type_empty(Lexer *l)
+{
+    (void)l;
+    return (Token){ .type = TOKEN_TYPE_END };
 }
