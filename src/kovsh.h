@@ -30,6 +30,7 @@ typedef enum {
     TOKEN_TYPE_NUMBER,
     TOKEN_TYPE_BOOL,
     TOKEN_TYPE_EQ,
+    TOKEN_TYPE_INVALID,
 
     TOKEN_TYPE_END,
     TOKEN_TYPE_ENUM_END
@@ -72,8 +73,10 @@ Lexer ksh_lexer_new(StrSlice ss);
 const char *ksh_lexer_token_type_to_string(TokenType token_type);
 void ksh_lexer_inc(Lexer *l, size_t inc);
 
-Token ksh_lexer_expect_token_next(Lexer *l, TokenType expect);
-Token ksh_lexer_token_next(Lexer *l);
+TokenType ksh_lexer_compute_token_type(Lexer *l);
+Token ksh_lexer_make_token(Lexer *l, TokenType tt);
+Token ksh_lexer_expect_next_token(Lexer *l, TokenType expect);
+Token ksh_lexer_next_token(Lexer *l);
 bool  ksh_lexer_is_token_next(Lexer *l, TokenType t);
 
 TokenSeq ksh_token_seq_from_lexer(Lexer *l, size_t count);
