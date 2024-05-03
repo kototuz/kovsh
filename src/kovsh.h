@@ -53,11 +53,18 @@ typedef struct {
 
 typedef enum {
     CONTEXT_USE_CMD_CALL,
-    CONTEXT_USE_ARG_ASSIGN,
+    CONTEXT_USE_ARG_NAME,
+    CONTEXT_USE_ARG_VALUE,
+    CONTEXT_USE_NONE
 } ContextUse;
 
+typedef struct {
+    StrSlice arg_name;
+    StrSlice arg_value;
+} ContextArgAssignment;
+
 typedef struct ContextEntry {
-    TokenSeq ts;
+    Token token;
     ContextUse ctx_use;
     struct ContextEntry *next;
 } ContextEntry;
@@ -86,14 +93,15 @@ bool  ksh_lexer_is_token_next(Lexer *l, TokenType t);
 
 TokenSeq ksh_token_seq_from_lexer(Lexer *l, size_t count);
 
-void ksh_lexer_parse_to_context(Lexer *l, Context *context);
+Context ksh_context_new(void);
+void ksh_context_init(Lexer *l, Context *context);
 void ksh_context_write(Context *context, ContextEntry *ce);
 void ksh_context_delete(Context *context);
-Context ksh_context_new(void);
 
-ContextEntry *ksh_context_entry_create(TokenSeq ts, ContextUse ctx_use);
+ContextEntry *ksh_context_entry_create(Token t, ContextUse ctx_use);
 const char *ksh_context_use_to_str(ContextUse ctx_use);
 
 bool ksh_context_iter_next(ContextIter *ctx_iter, ContextEntry **output);
+
 
 #endif
