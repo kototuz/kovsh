@@ -21,7 +21,6 @@ void strslice_print(StrSlice s);
 typedef struct {
     StrSlice text;
     size_t cursor;
-    int cur_letter;
 } Lexer;
 
 typedef enum {
@@ -41,45 +40,6 @@ typedef struct {
     StrSlice text;
 } Token;
 
-typedef struct {
-    Lexer *l;
-    TokenType type;
-} LazyToken;
-
-typedef struct {
-    size_t len;
-    Token *items;
-} TokenSeq;
-
-typedef enum {
-    CONTEXT_USE_CMD_CALL,
-    CONTEXT_USE_ARG_NAME,
-    CONTEXT_USE_ARG_VALUE,
-    CONTEXT_USE_NONE
-} ContextUse;
-
-typedef struct {
-    StrSlice arg_name;
-    StrSlice arg_value;
-} ContextArgAssignment;
-
-typedef struct ContextEntry {
-    Token token;
-    ContextUse ctx_use;
-    struct ContextEntry *next;
-} ContextEntry;
-
-typedef struct {
-    size_t entries_len;
-    ContextEntry *first;
-    ContextEntry *last;
-} Context;
-
-typedef struct {
-    Context context;
-    ContextEntry *cursor;
-} ContextIter;
-
 Lexer ksh_lexer_new(StrSlice ss);
 
 const char *ksh_lexer_token_type_to_string(TokenType token_type);
@@ -90,18 +50,5 @@ Token ksh_lexer_make_token(Lexer *l, TokenType tt);
 Token ksh_lexer_expect_next_token(Lexer *l, TokenType expect);
 Token ksh_lexer_next_token(Lexer *l);
 bool  ksh_lexer_is_token_next(Lexer *l, TokenType t);
-
-TokenSeq ksh_token_seq_from_lexer(Lexer *l, size_t count);
-
-Context ksh_context_new(void);
-void ksh_context_init(Lexer *l, Context *context);
-void ksh_context_write(Context *context, ContextEntry *ce);
-void ksh_context_delete(Context *context);
-
-ContextEntry *ksh_context_entry_create(Token t, ContextUse ctx_use);
-const char *ksh_context_use_to_str(ContextUse ctx_use);
-
-bool ksh_context_iter_next(ContextIter *ctx_iter, ContextEntry **output);
-
 
 #endif

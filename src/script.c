@@ -6,48 +6,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-typedef struct {
-    TokenType tt;
-    ContextUse ctx_use;
-} TTPatternPair;
-
-typedef struct {
-    TTPatternPair *items;
-    size_t len;
-} TTPattern;
-
-#define TOKEN_TYPE_PATTERNS_CAP (sizeof(token_type_patterns) / sizeof(TTPattern))
-static const TTPattern token_type_patterns[] = {
-    {
-        .items = (TTPatternPair[]){
-            { TOKEN_TYPE_LIT, CONTEXT_USE_ARG_NAME },
-            { TOKEN_TYPE_EQ, CONTEXT_USE_NONE },
-            { TOKEN_TYPE_LIT, CONTEXT_USE_ARG_VALUE }
-        },
-        .len = 3
-    },
-    {
-        .items = (TTPatternPair[]){
-            { TOKEN_TYPE_LIT, CONTEXT_USE_ARG_NAME },
-            { TOKEN_TYPE_EQ, CONTEXT_USE_NONE },
-            { TOKEN_TYPE_STRING, CONTEXT_USE_ARG_VALUE }
-        },
-        .len = 3
-    },
-    {
-        .items = (TTPatternPair[]){
-            { TOKEN_TYPE_LIT, CONTEXT_USE_ARG_NAME },
-            { TOKEN_TYPE_EQ, CONTEXT_USE_NONE },
-            { TOKEN_TYPE_NUMBER, CONTEXT_USE_ARG_VALUE }
-        },
-        .len = 3
-    },
-    {
-        .items = (TTPatternPair[]){ { TOKEN_TYPE_LIT, CONTEXT_USE_CMD_CALL } },
-        .len = 1
-    }
-};
-
 typedef Token (*TokenMakeFn)(Lexer *);
 
 static Token token_lit_make_fn(Lexer *);
@@ -71,7 +29,6 @@ const StrSlice BOOL_FALSE_KEYWORD = { .items = "false", .len = 5 };
 static void lexer_trim(Lexer *l);
 static bool is_lit(int letter);
 static bool lexer_at_keyword(Lexer *l, StrSlice keyword);
-static bool ksh_lexer_match_pattern(Lexer *l, TTPattern pat);
 
 // PUBLIC FUNCTIONS
 const char *ksh_lexer_token_type_to_string(TokenType tt)
@@ -135,7 +92,7 @@ Token ksh_lexer_next_token(Lexer *l)
 
 void ksh_lexer_inc(Lexer *l, size_t inc)
 {
-    l->cur_letter = l->text.items[(l->cursor += inc)];
+    l->cursor += inc;
 }
 
 Token ksh_lexer_expect_next_token(Lexer *l, TokenType expect)
@@ -156,117 +113,6 @@ Token ksh_lexer_expect_next_token(Lexer *l, TokenType expect)
 bool ksh_lexer_is_token_next(Lexer *l, TokenType t)
 {
     return ksh_lexer_compute_token_type(l) == t;
-}
-
-TokenSeq ksh_token_seq_from_lexer(Lexer *l, size_t count)
-{
-    TokenSeq result = {
-        .items = (Token *)malloc(sizeof(Token) * count),
-        .len = count
-    };
-
-    if (!result.items) {
-        fputs("ERROR: could not allocate memmory\n", stderr);
-        exit(1);
-    }
-
-    for (size_t i = 0; i < count; i++) {
-        Token token = ksh_lexer_next_token(l);
-        if (token.type == TOKEN_TYPE_END) {
-            fprintf(stderr, "ERROR: could not get %zu tokens: tokens are over", count);
-            exit(1);
-        }
-        result.items[i] = token;
-    }
-
-    return result;
-}
-
-void ksh_context_delete(Context *context)
-{
-    ContextEntry *tmp;
-    ContextEntry *it = context->first;
-    while (it != NULL) {
-        tmp = it;
-        it = it->next;
-        free(tmp);
-    }
-}
-
-Context ksh_context_new(void)
-{
-    return (Context) { .first = NULL, .last = NULL };
-}
-
-ContextEntry *ksh_context_entry_create(Token t, ContextUse ctx_use) {
-    ContextEntry *result = (ContextEntry *)malloc(sizeof(ContextEntry));
-    if (!result) {
-        fputs("ERROR: could not allocate memmory for `ContextEntry`\n", stderr);
-        exit(1);
-    }
-
-    *result = (ContextEntry) {
-        .token = t,
-        .ctx_use = ctx_use,
-        .next = NULL,
-    };
-
-    return result;
-}
-
-void ksh_context_write(Context *context, ContextEntry *ce)
-{
-    if (context->first == NULL) {
-        context->first = context->last = ce;
-    } else {
-        context->last = context->last->next = ce;
-    }
-    context->entries_len++;
-}
-
-void ksh_context_init(Lexer *l, Context *context)
-{
-    for (size_t i = 0; i < TOKEN_TYPE_PATTERNS_CAP;) {
-        TTPattern pattern = token_type_patterns[i];
-
-        if (!ksh_lexer_match_pattern(l, pattern)) {
-            i++;
-            continue;
-        }
-
-        for (size_t y = 0; y < pattern.len; y++) {
-            Token t = ksh_lexer_expect_next_token(l, pattern.items[y].tt);
-            ContextEntry *entry = ksh_context_entry_create(t, pattern.items[y].ctx_use);
-            ksh_context_write(context, entry);
-        }
-        i = 0;
-    }
-}
-
-const char *ksh_context_use_to_str(ContextUse ctx_use)
-{
-    switch (ctx_use) {
-    case CONTEXT_USE_CMD_CALL: return "cmd call";
-    case CONTEXT_USE_ARG_NAME: return "arg name";
-    case CONTEXT_USE_ARG_VALUE: return "arg value";
-    case CONTEXT_USE_NONE: return "none";
-    default: return "unknown";
-    }
-}
-
-bool ksh_context_iter_next(ContextIter *ctx_iter, ContextEntry **output)
-{
-    if (ctx_iter->cursor == NULL) {
-        if (ctx_iter->context.first == NULL) return false;
-        ctx_iter->cursor = ctx_iter->context.first;
-        *output = ctx_iter->cursor;
-        return true;
-    }
-
-    if (ctx_iter->cursor->next == NULL) return false;
-    ctx_iter->cursor = ctx_iter->cursor->next;
-    *output = ctx_iter->cursor;
-    return true;
 }
 
 int main(void)
@@ -292,20 +138,6 @@ int main(void)
     }
 
     putchar('\n');
-
-    lexer.cursor = 0;
-
-    Context context = ksh_context_new();
-    ksh_context_init(&lexer, &context);
-    ContextIter iter = { .context = context };
-
-    printf("%zu\n", iter.context.entries_len);
-
-    ContextEntry *entry;
-    while (ksh_context_iter_next(&iter, &entry)) {
-        strslice_print(entry->token.text);
-        printf(" -> %s\n", ksh_context_use_to_str(entry->ctx_use));
-    }
 }
 
 // PRIVATE FUNCTIONS
@@ -329,24 +161,6 @@ static bool lexer_at_keyword(Lexer *l, StrSlice ss)
 
     return false;
 }
-
-static bool ksh_lexer_match_pattern(Lexer *l, TTPattern pat)
-{
-    size_t checkpoint = l->cursor;
-    for (size_t i = 0; i < pat.len; i++) {
-        if (ksh_lexer_is_token_next(l, pat.items[i].tt)) {
-            ksh_lexer_inc(l, (ksh_lexer_make_token(l, pat.items[i].tt)).text.len);
-        } else {
-            l->cursor = checkpoint;
-            return false;
-        }
-    }
-
-    l->cursor = checkpoint;
-    return true;
-}
-
-
 
 static Token token_lit_make_fn(Lexer *l)
 {
