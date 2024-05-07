@@ -115,29 +115,67 @@ bool ksh_lexer_is_token_next(Lexer *l, TokenType t)
     return ksh_lexer_compute_token_type(l) == t;
 }
 
-int main(void)
+CommandArgVal ksh_token_parse_to_arg_val(Token token)
 {
-    const char *text = "echo msg=\"Hello world\" rep=100";
-    StrSlice ss = { .items = text, .len = strlen(text) };
-
-    Lexer lexer = ksh_lexer_new(ss);
-
-    printf("%d\n", ksh_lexer_is_token_next(&lexer, TOKEN_TYPE_LIT));
-    Token t = ksh_lexer_expect_next_token(&lexer, TOKEN_TYPE_LIT);
-    strslice_print(t.text);
-    putchar('\n');
-
-    lexer.cursor = 0;
-
-    Token token = ksh_lexer_next_token(&lexer);
-    while (token.type != TOKEN_TYPE_END) {
-        strslice_print(token.text);
-        printf(" -> %s\n", ksh_lexer_token_type_to_string(token.type));
-
-        token = ksh_lexer_next_token(&lexer);
+    CommandArgVal result = {0};
+    switch (token.type) {
+    case TOKEN_TYPE_LIT:
+        result.kind = COMMAND_ARG_VAL_KIND_STR;
+        result.as_str = token.text;
+        break;
+    case TOKEN_TYPE_STRING:
+        result.kind = COMMAND_ARG_VAL_KIND_STR;
+        result.as_str = (StrSlice){
+            .items = token.text.items+1,
+            .len = token.text.len-2,
+        };
+        break;
+    case TOKEN_TYPE_NUMBER:
+        result.kind = COMMAND_ARG_VAL_KIND_INT;
+        char *buf = malloc(token.text.len);
+        memcpy(buf, token.text.items, token.text.len);
+        result.as_int = atoi(buf);
+        free(buf);
+        break;
+    case TOKEN_TYPE_BOOL:
+        result.kind = COMMAND_ARG_VAL_KIND_BOOL;
+        result.as_bool = token.text.items[0] == 't' ? true : false;
+        break;
+    default:
+        fprintf(stderr, "ERROR: ksh_token_parse_to_arg_val: %s not yet implemented",
+              ksh_lexer_token_type_to_string(token.type));
+        exit(1);
     }
 
-    putchar('\n');
+    return result;
+}
+
+void ksh_parse_lexer(Lexer *l)
+{
+    StrSlice cmd_name = (ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT)).text;
+    Command *cmd = ksh_command_find(cmd_name);
+    if (cmd == NULL) {
+        fputs("ERROR: command ", stderr);
+        strslice_print(cmd_name, stderr);
+        fputs(" not found\n", stderr);
+    }
+
+    CommandCall cmd_call = ksh_command_create_call(cmd);
+
+    TokenType next = ksh_lexer_compute_token_type(l);
+    while (next == TOKEN_TYPE_LIT) {
+        StrSlice arg_name = (ksh_lexer_expect_next_token(l, next)).text;
+
+        ksh_lexer_expect_next_token(l, TOKEN_TYPE_EQ);
+        Token token = ksh_lexer_next_token(l);
+        CommandArgVal arg_value = ksh_token_parse_to_arg_val(token);
+
+        ksh_commandcall_set_arg(&cmd_call, arg_name, arg_value);
+
+        next = ksh_lexer_compute_token_type(l);
+    }
+
+    ksh_commandcall_exec(cmd_call);
 }
 
 // PRIVATE FUNCTIONS

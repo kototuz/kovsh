@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 // UTILS
 typedef struct {
@@ -12,7 +13,64 @@ typedef struct {
 
 StrSlice strslice_from_bounds(char *begin, char *end);
 void strslice_new(StrSlice *ss, size_t len, char items[*]);
-void strslice_print(StrSlice s);
+void strslice_print(StrSlice s, FILE *output);
+int  strslice_cmp(StrSlice ss1, StrSlice ss2);
+
+///////////////////////////////////////////////
+/// COMMAND
+//////////////////////////////////////////////
+
+
+typedef enum {
+    COMMAND_ARG_VAL_KIND_STR,
+    COMMAND_ARG_VAL_KIND_INT,
+    COMMAND_ARG_VAL_KIND_BOOL,
+} CommandArgValKind;
+
+typedef struct {
+    CommandArgValKind kind;
+    union {
+        StrSlice as_str;
+        int as_int;
+        bool as_bool;
+    };
+} CommandArgVal;
+
+typedef struct {
+    StrSlice name;
+    const char *usage;
+    CommandArgVal value;
+} CommandArg;
+
+typedef int (*CommandFn)(size_t argc, CommandArg argv[argc]);
+
+typedef struct {
+    StrSlice name;
+    const char *desc;
+    CommandFn fn;
+    CommandArg *expected_args;
+    size_t expected_args_len;
+} Command;
+
+typedef struct {
+    CommandFn fn;
+    CommandArg *argv;
+    size_t argc;
+} CommandCall;
+
+Command *ksh_commands_add(Command cmd);
+
+void ksh_command_print(Command cmd);
+Command *ksh_command_find(StrSlice ss);
+CommandCall ksh_command_create_call(Command *cmd);
+
+void ksh_commandcall_set_arg(CommandCall *cmd_call, StrSlice arg_name, CommandArgVal value);
+void ksh_commandcall_exec(CommandCall call);
+
+const char *ksh_commandargvalkind_to_str(CommandArgValKind cavt);
+void ksh_commandarg_print(CommandArg cmd_arg);
+CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrSlice ss);
+
 
 ///////////////////////////////////////////////
 /// LEXER
@@ -50,5 +108,8 @@ Token ksh_lexer_make_token(Lexer *l, TokenType tt);
 Token ksh_lexer_expect_next_token(Lexer *l, TokenType expect);
 Token ksh_lexer_next_token(Lexer *l);
 bool  ksh_lexer_is_token_next(Lexer *l, TokenType t);
+
+CommandArgVal ksh_token_parse_to_arg_val(Token token);
+void ksh_parse_lexer(Lexer *l);
 
 #endif

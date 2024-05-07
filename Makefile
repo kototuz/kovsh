@@ -1,11 +1,13 @@
 cc := gcc
 cflags := -Wall -Wextra -pedantic -g
 
-bin := zig-out/bin
-objs := zig-out/objs
+out := zig-out
+bin := $(out)/bin
+objs := $(out)/objs
 
 kovsh_main := src/main.c
 kovsh_sources := $(wildcard src/*.c)
+kovsh_sources := $(subst src/main.c,,$(kovsh_sources))
 kovsh_objects = $(subst src/, $(objs)/, $(kovsh_sources))
 kovsh_objects := $(kovsh_objects:.c=.o)
 
@@ -32,4 +34,4 @@ run: $(patsubst %.c, %,$(subst src/, $(bin)/, $(run_file)))
 	./zig-out/bin/$(basename $(notdir $<))
 
 clean:
-	rm -rf $(bin)/* $(kovsh_objects)
+	rm -rf $(out)/*/* $(kovsh_objects)
