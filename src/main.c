@@ -30,10 +30,13 @@ int main(void)
     ksh_command_print(echo);
     ksh_commands_add(echo);
 
-    const char *text = "echo";
+    const char *text = "echo msg=100";
     StrSlice line = { .items = text, .len = strlen(text) };
     Lexer lexer = ksh_lexer_new(line);
-    ksh_parse_lexer(&lexer);
+
+    if (ksh_parse_lexer(&lexer) != KSH_ERR_OK) {
+        return 1;
+    }
 
     return 0;
 }

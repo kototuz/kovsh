@@ -92,22 +92,23 @@ Token ksh_lexer_next_token(Lexer *l)
 
 void ksh_lexer_inc(Lexer *l, size_t inc)
 {
+    assert(l->cursor + inc <= l->text.len);
     l->cursor += inc;
 }
 
-Token ksh_lexer_expect_next_token(Lexer *l, TokenType expect)
+KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
 {
     TokenType tt = ksh_lexer_compute_token_type(l);
     if (tt != expect) {
-        fprintf(stderr, "ERROR: %s was expected but %s is occured\n",
-                ksh_lexer_token_type_to_string(expect),
-                ksh_lexer_token_type_to_string(tt));
-        exit(1);
+        KSH_LOG_ERR("token_expected: %s was expected but %s was occured\n",
+                    ksh_lexer_token_type_to_string(expect),
+                    ksh_lexer_token_type_to_string(tt));
+        return KSH_ERR_TOKEN_EXPECTED;
     }
 
-    Token token = ksh_lexer_make_token(l, expect);
-    ksh_lexer_inc(l, token.text.len);
-    return token;
+    *out = ksh_lexer_make_token(l, expect);
+    ksh_lexer_inc(l, out->text.len);
+    return KSH_ERR_OK;
 }
 
 bool ksh_lexer_is_token_next(Lexer *l, TokenType t)
@@ -142,40 +143,51 @@ CommandArgVal ksh_token_parse_to_arg_val(Token token)
         result.as_bool = token.text.items[0] == 't' ? true : false;
         break;
     default:
-        fprintf(stderr, "ERROR: ksh_token_parse_to_arg_val: %s not yet implemented",
-              ksh_lexer_token_type_to_string(token.type));
-        exit(1);
+        assert(0 && "not yet implemented");
     }
 
     return result;
 }
 
-void ksh_parse_lexer(Lexer *l)
+KshErr ksh_parse_lexer(Lexer *l)
 {
-    StrSlice cmd_name = (ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT)).text;
-    Command *cmd = ksh_command_find(cmd_name);
+    KshErr err;
+
+    Token cmd_token; 
+    err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &cmd_token);
+    if (err != KSH_ERR_OK) return err;
+
+    Command *cmd = ksh_command_find(cmd_token.text);
     if (cmd == NULL) {
-        fputs("ERROR: command ", stderr);
-        strslice_print(cmd_name, stderr);
-        fputs(" not found\n", stderr);
+        KSH_LOG_ERR("command not found: %s", "");
+        strslice_print(cmd_token.text, stderr);
+        putc('\n', stderr);
+        return KSH_ERR_COMMAND_NOT_FOUND;
     }
 
     CommandCall cmd_call = ksh_command_create_call(cmd);
 
     TokenType next = ksh_lexer_compute_token_type(l);
     while (next == TOKEN_TYPE_LIT) {
-        StrSlice arg_name = (ksh_lexer_expect_next_token(l, next)).text;
+        Token arg_name;
+        err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &arg_name);
+        if (err != KSH_ERR_OK) return err;
 
-        ksh_lexer_expect_next_token(l, TOKEN_TYPE_EQ);
+        Token eq;
+        err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_EQ, &eq);
+        if (err != KSH_ERR_OK) return err;
+
         Token token = ksh_lexer_next_token(l);
         CommandArgVal arg_value = ksh_token_parse_to_arg_val(token);
 
-        ksh_commandcall_set_arg(&cmd_call, arg_name, arg_value);
+        err = ksh_commandcall_set_arg(&cmd_call, arg_name.text, arg_value);
+        if (err != KSH_ERR_OK) return err;
 
         next = ksh_lexer_compute_token_type(l);
     }
 
     ksh_commandcall_exec(cmd_call);
+    return KSH_ERR_OK;
 }
 
 // PRIVATE FUNCTIONS
@@ -227,9 +239,8 @@ static Token token_string_make_fn(Lexer *l)
     };
 
     while (l->text.items[cursor] != '"') {
-        if (l->text.items[cursor] == '\0') {
-            fputs("ERROR: the closing qoute was missed\n", stderr);
-            exit(1);
+        if (l->text.items[cursor+1] == '\0') {
+            break;
         }
         cursor++;
         result.text.len++;

@@ -5,7 +5,20 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#define KSH_LOG_ERR(msg, ...) fprintf(stderr, "[KOVSH ERR]: " msg, __VA_ARGS__)
+
 // UTILS
+// ERRORS
+typedef enum {
+    KSH_ERR_OK = 0,
+    KSH_ERR_COMMAND_NOT_FOUND,
+    KSH_ERR_ARG_NOT_FOUND,
+    KSH_ERR_TOKEN_EXPECTED,
+    KSH_ERR_TYPE_EXPECTED
+} KshErr;
+
+const char *ksh_err_str(KshErr err);
+
 typedef struct {
     size_t len;
     const char *items;
@@ -64,7 +77,7 @@ void ksh_command_print(Command cmd);
 Command *ksh_command_find(StrSlice ss);
 CommandCall ksh_command_create_call(Command *cmd);
 
-void ksh_commandcall_set_arg(CommandCall *cmd_call, StrSlice arg_name, CommandArgVal value);
+KshErr ksh_commandcall_set_arg(CommandCall *cmd_call, StrSlice arg_name, CommandArgVal value);
 void ksh_commandcall_exec(CommandCall call);
 
 const char *ksh_commandargvalkind_to_str(CommandArgValKind cavt);
@@ -105,11 +118,11 @@ void ksh_lexer_inc(Lexer *l, size_t inc);
 
 TokenType ksh_lexer_compute_token_type(Lexer *l);
 Token ksh_lexer_make_token(Lexer *l, TokenType tt);
-Token ksh_lexer_expect_next_token(Lexer *l, TokenType expect);
+KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
 Token ksh_lexer_next_token(Lexer *l);
 bool  ksh_lexer_is_token_next(Lexer *l, TokenType t);
 
 CommandArgVal ksh_token_parse_to_arg_val(Token token);
-void ksh_parse_lexer(Lexer *l);
+KshErr ksh_parse_lexer(Lexer *l);
 
 #endif
