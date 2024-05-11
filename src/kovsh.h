@@ -63,8 +63,8 @@ typedef struct {
     StrView name;
     const char *desc;
     CommandFn fn;
-    CommandArg *expected_args;
-    size_t expected_args_len;
+    CommandArg *argv;
+    size_t argc;
 } Command;
 
 typedef struct {
@@ -73,6 +73,26 @@ typedef struct {
     size_t argc;
 } CommandCall;
 
+typedef struct {
+    Command *items;
+    size_t len;
+} CommandBuff;
+
+typedef struct {
+    const char *name;
+    const char *desc;
+    CommandFn fn;
+    CommandArg *argv;
+    size_t argc;
+} CommandOpt;
+
+typedef struct {
+    const char *name;
+    const char *usage;
+    CommandArgVal value;
+} CommandArgOpt;
+
+Command ksh_command_new(CommandOpt opt);
 Command *ksh_commands_add(Command cmd);
 
 void ksh_command_print(Command cmd);
@@ -82,6 +102,7 @@ CommandCall ksh_command_create_call(Command *cmd);
 KshErr ksh_commandcall_set_arg(CommandCall *cmd_call, StrView arg_name, CommandArgVal value);
 void ksh_commandcall_exec(CommandCall call);
 
+CommandArg ksh_commandarg_new(CommandArgOpt);
 const char *ksh_commandargvalkind_to_str(CommandArgValKind cavt);
 void ksh_commandarg_print(CommandArg cmd_arg);
 CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrView sv);
@@ -114,10 +135,8 @@ typedef struct {
 } Token;
 
 Lexer ksh_lexer_new(StrView sv);
-
 const char *ksh_lexer_token_type_to_string(TokenType token_type);
 void ksh_lexer_inc(Lexer *l, size_t inc);
-
 TokenType ksh_lexer_compute_token_type(Lexer *l);
 Token ksh_lexer_make_token(Lexer *l, TokenType tt);
 KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);

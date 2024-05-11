@@ -9,6 +9,31 @@
 static Command commands[MAX_COMMANDS_LEN] = {0};
 static int command_cursor = 0;
 
+Command ksh_command_new(CommandOpt opt)
+{
+    assert(opt.name != 0);
+    assert(opt.fn != 0);
+
+    return (Command){
+        .name = strv_new(opt.name, strlen(opt.name)),
+        .desc = opt.desc ? opt.desc : "None",
+        .fn = opt.fn,
+        .argv = opt.argv,
+        .argc = opt.argc
+    };
+}
+
+CommandArg ksh_commandarg_new(CommandArgOpt opt)
+{
+    assert(opt.name != 0);
+
+    return (CommandArg) {
+        .name = strv_new(opt.name, strlen(opt.name)),
+        .usage = opt.usage ? opt.usage : "None",
+        .value = opt.value,
+    };
+}
+
 Command *ksh_commands_add(Command cmd)
 {
     assert(command_cursor < MAX_COMMANDS_LEN);
@@ -18,10 +43,11 @@ Command *ksh_commands_add(Command cmd)
 
 void ksh_command_print(Command cmd)
 {
-    printf("COMMAND: "STRV_FMT"\n", STRV_ARG(cmd.name));
-    printf("DESCRIPTION: %s\n", cmd.desc);
-    for (size_t i = 0; i < cmd.expected_args_len; i++) {
-        ksh_commandarg_print(cmd.expected_args[i]);
+    printf("[COMMAND]:\t"STRV_FMT"\n", STRV_ARG(cmd.name));
+    printf("[DESCRIPTION]:\t%s\n", cmd.desc);
+    puts("[ARGS]:");
+    for (size_t i = 0; i < cmd.argc; i++) {
+        ksh_commandarg_print(cmd.argv[i]);
     }
 }
 
@@ -49,7 +75,7 @@ CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrView ss)
 
 void ksh_commandarg_print(CommandArg arg)
 {
-    printf("ARG: "STRV_FMT". Type: %s. Usage: %s\n",
+    printf("\t"STRV_FMT"=<%s>\t%s\n",
            STRV_ARG(arg.name),
            ksh_commandargvalkind_to_str(arg.value.kind),
            arg.usage);
@@ -69,8 +95,8 @@ CommandCall ksh_command_create_call(Command *cmd)
 {
     return (CommandCall){
         .fn = cmd->fn,
-        .argc = cmd->expected_args_len,
-        .argv = cmd->expected_args
+        .argc = cmd->argc,
+        .argv = cmd->argv
     };
 }
 
@@ -89,6 +115,7 @@ KshErr ksh_commandcall_set_arg(CommandCall *cmd_call, StrView arg_name, CommandA
         return KSH_ERR_TYPE_EXPECTED;
     }
 
+    arg->value = value;
     return KSH_ERR_OK;
 }
 

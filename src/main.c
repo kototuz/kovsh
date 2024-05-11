@@ -5,30 +5,36 @@
 
 int echo_fn(size_t argc, CommandArg argv[argc])
 {
-    printf("Message: "STRV_FMT, STRV_ARG(argv[0].value.as_str));
+    for (int i = 0; i < argv[1].value.as_int; i++) {
+        printf("Message: "STRV_FMT"\n", STRV_ARG(argv[0].value.as_str));
+    }
     return 1;
 }
 
 int main(void)
 {
-    Command echo = {
-        .name = STRV_LIT("echo"),
-        .desc = "Print message",
+    Command echo = ksh_command_new((CommandOpt){
+        .name = "echo",
         .fn = echo_fn,
-        .expected_args = (CommandArg[]){
-            {
-                .name = STRV_LIT("msg"),
-                .usage = "Message that will been printing",
+        .argv = (CommandArg[]){
+            ksh_commandarg_new((CommandArgOpt){
+                .name = "msg",
                 .value.kind = COMMAND_ARG_VAL_KIND_STR,
-                .value.as_str = STRV_LIT("All hail Britania!!!")
-            }
+                .value.as_str = STRV_LIT("All Hail Britania!!!")
+            }),
+            ksh_commandarg_new((CommandArgOpt){
+                .name = "rep",
+                .value.kind = COMMAND_ARG_VAL_KIND_INT,
+                .value.as_int = 1,
+            })
         },
-        .expected_args_len = 1
-    };
+        .argc = 2
+    });
+
     ksh_command_print(echo);
     ksh_commands_add(echo);
 
-    StrView line = STRV_LIT("echo msg=");
+    StrView line = STRV_LIT("echo rep=100");
     Lexer lexer = ksh_lexer_new(line);
 
     if (ksh_parse_lexer(&lexer) != KSH_ERR_OK) {
