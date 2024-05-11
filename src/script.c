@@ -22,13 +22,13 @@ static const TokenMakeFn TOKEN_MAKE_FUNCTIONS[] = {
 };
 
 // KEYWORDS
-const StrSlice BOOL_TRUE_KEYWORD = { .items = "true", .len = 4 };
-const StrSlice BOOL_FALSE_KEYWORD = { .items = "false", .len = 5 };
+const StrView BOOL_TRUE_KEYWORD = { .items = "true", .len = 4 };
+const StrView BOOL_FALSE_KEYWORD = { .items = "false", .len = 5 };
 
 // PRIVATE FUNCTION DECLARATIONS
 static void lexer_trim(Lexer *l);
 static bool is_lit(int letter);
-static bool lexer_at_keyword(Lexer *l, StrSlice keyword);
+static bool lexer_at_keyword(Lexer *l, StrView keyword);
 
 // PUBLIC FUNCTIONS
 const char *ksh_lexer_token_type_to_string(TokenType tt)
@@ -44,7 +44,7 @@ const char *ksh_lexer_token_type_to_string(TokenType tt)
     }
 }
 
-Lexer ksh_lexer_new(StrSlice ss)
+Lexer ksh_lexer_new(StrView ss)
 {
     return (Lexer) { .text = ss };
 }
@@ -100,7 +100,7 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
 {
     TokenType tt = ksh_lexer_compute_token_type(l);
     if (tt != expect) {
-        KSH_LOG_ERR("token_expected: %s was expected but %s was occured\n",
+        KSH_LOG_ERR("token_expected: %s was expected but %s was occured",
                     ksh_lexer_token_type_to_string(expect),
                     ksh_lexer_token_type_to_string(tt));
         return KSH_ERR_TOKEN_EXPECTED;
@@ -126,7 +126,7 @@ CommandArgVal ksh_token_parse_to_arg_val(Token token)
         break;
     case TOKEN_TYPE_STRING:
         result.kind = COMMAND_ARG_VAL_KIND_STR;
-        result.as_str = (StrSlice){
+        result.as_str = (StrView){
             .items = token.text.items+1,
             .len = token.text.len-2,
         };
@@ -159,9 +159,7 @@ KshErr ksh_parse_lexer(Lexer *l)
 
     Command *cmd = ksh_command_find(cmd_token.text);
     if (cmd == NULL) {
-        KSH_LOG_ERR("command not found: %s", "");
-        strslice_print(cmd_token.text, stderr);
-        putc('\n', stderr);
+        KSH_LOG_ERR("command not found: "STRV_FMT, STRV_ARG(cmd_token.text));
         return KSH_ERR_COMMAND_NOT_FOUND;
     }
 
@@ -202,7 +200,7 @@ static bool is_lit(int letter)
            || ('0' <= letter && letter <= '9');
 }
 
-static bool lexer_at_keyword(Lexer *l, StrSlice ss)
+static bool lexer_at_keyword(Lexer *l, StrView ss)
 {
     if ((l->text.len - l->cursor == ss.len)
        || isspace(l->text.items[l->cursor+ss.len])) {

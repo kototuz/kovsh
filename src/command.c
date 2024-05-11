@@ -18,19 +18,17 @@ Command *ksh_commands_add(Command cmd)
 
 void ksh_command_print(Command cmd)
 {
-    printf("COMMAND: ");
-    strslice_print(cmd.name, stdout);
-    putchar('\n');
+    printf("COMMAND: "STRV_FMT"\n", STRV_ARG(cmd.name));
     printf("DESCRIPTION: %s\n", cmd.desc);
     for (size_t i = 0; i < cmd.expected_args_len; i++) {
         ksh_commandarg_print(cmd.expected_args[i]);
     }
 }
 
-Command *ksh_command_find(StrSlice ss)
+Command *ksh_command_find(StrView sv)
 {
     for (size_t i = 0; i < MAX_COMMANDS_LEN; i++) {
-        if (strslice_cmp(commands[i].name, ss) == 0) {
+        if (strv_eq(sv, commands[i].name)) {
             return &commands[i];
         }
     }
@@ -38,10 +36,10 @@ Command *ksh_command_find(StrSlice ss)
     return NULL;
 }
 
-CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrSlice ss)
+CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrView ss)
 {
     for (size_t i = 0; i < len; i++) {
-        if (strslice_cmp(args[i].name, ss) == 0) {
+        if (strv_eq(ss, args[i].name)) {
             return &args[i];
         }
     }
@@ -51,9 +49,8 @@ CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrSlice ss)
 
 void ksh_commandarg_print(CommandArg arg)
 {
-    printf("ARG: ");
-    strslice_print(arg.name, stdout);
-    printf(". Type: %s. Usage: %s\n",
+    printf("ARG: "STRV_FMT". Type: %s. Usage: %s\n",
+           STRV_ARG(arg.name),
            ksh_commandargvalkind_to_str(arg.value.kind),
            arg.usage);
 }
@@ -77,20 +74,18 @@ CommandCall ksh_command_create_call(Command *cmd)
     };
 }
 
-KshErr ksh_commandcall_set_arg(CommandCall *cmd_call, StrSlice arg_name, CommandArgVal value)
+KshErr ksh_commandcall_set_arg(CommandCall *cmd_call, StrView arg_name, CommandArgVal value)
 {
     CommandArg *arg = ksh_commandarg_find(cmd_call->argc, cmd_call->argv, arg_name);
     if (arg == NULL) {
-        KSH_LOG_ERR("arg not found: %s", "");
-        strslice_print(arg_name, stderr);
-        putc('\n', stderr);
+        KSH_LOG_ERR("arg not found: "STRV_FMT, STRV_ARG(arg_name));
         return KSH_ERR_ARG_NOT_FOUND;
     }
 
     if (arg->value.kind != value.kind) {
-        KSH_LOG_ERR("the `%s", "");
-        strslice_print(arg->name, stderr);
-        fprintf(stderr, "` argument type is %s\n", ksh_commandargvalkind_to_str(arg->value.kind));
+        KSH_LOG_ERR("the `"STRV_FMT"` argument type is %s",
+                    STRV_ARG(arg->name),
+                    ksh_commandargvalkind_to_str(arg->value.kind));
         return KSH_ERR_TYPE_EXPECTED;
     }
 

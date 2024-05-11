@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define KSH_LOG_ERR(msg, ...) fprintf(stderr, "[KOVSH ERR]: " msg, __VA_ARGS__)
+#define KSH_LOG_ERR(msg, ...) fprintf(stderr, "[KOVSH ERR]: "msg"\n", __VA_ARGS__)
 
 // UTILS
 // ERRORS
@@ -22,17 +22,19 @@ const char *ksh_err_str(KshErr err);
 typedef struct {
     size_t len;
     const char *items;
-} StrSlice;
+} StrView;
 
-StrSlice strslice_from_bounds(char *begin, char *end);
-void strslice_new(StrSlice *ss, size_t len, char items[*]);
-void strslice_print(StrSlice s, FILE *output);
-int  strslice_cmp(StrSlice ss1, StrSlice ss2);
+#define STRV_LIT(lit) (strv_new(lit, sizeof(lit)-1))
+
+#define STRV_FMT "%.*s"
+#define STRV_ARG(sv) (int) (sv).len, (sv).items
+
+StrView strv_new(const char *data, size_t data_len);
+bool strv_eq(StrView sv1, StrView sv2);
 
 ///////////////////////////////////////////////
 /// COMMAND
 //////////////////////////////////////////////
-
 
 typedef enum {
     COMMAND_ARG_VAL_KIND_STR,
@@ -43,14 +45,14 @@ typedef enum {
 typedef struct {
     CommandArgValKind kind;
     union {
-        StrSlice as_str;
+        StrView as_str;
         int as_int;
         bool as_bool;
     };
 } CommandArgVal;
 
 typedef struct {
-    StrSlice name;
+    StrView name;
     const char *usage;
     CommandArgVal value;
 } CommandArg;
@@ -58,7 +60,7 @@ typedef struct {
 typedef int (*CommandFn)(size_t argc, CommandArg argv[argc]);
 
 typedef struct {
-    StrSlice name;
+    StrView name;
     const char *desc;
     CommandFn fn;
     CommandArg *expected_args;
@@ -74,15 +76,15 @@ typedef struct {
 Command *ksh_commands_add(Command cmd);
 
 void ksh_command_print(Command cmd);
-Command *ksh_command_find(StrSlice ss);
+Command *ksh_command_find(StrView sv);
 CommandCall ksh_command_create_call(Command *cmd);
 
-KshErr ksh_commandcall_set_arg(CommandCall *cmd_call, StrSlice arg_name, CommandArgVal value);
+KshErr ksh_commandcall_set_arg(CommandCall *cmd_call, StrView arg_name, CommandArgVal value);
 void ksh_commandcall_exec(CommandCall call);
 
 const char *ksh_commandargvalkind_to_str(CommandArgValKind cavt);
 void ksh_commandarg_print(CommandArg cmd_arg);
-CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrSlice ss);
+CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrView sv);
 
 
 ///////////////////////////////////////////////
@@ -90,7 +92,7 @@ CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrSlice ss);
 //////////////////////////////////////////////
 
 typedef struct {
-    StrSlice text;
+    StrView text;
     size_t cursor;
 } Lexer;
 
@@ -108,10 +110,10 @@ typedef enum {
 
 typedef struct {
     TokenType type;
-    StrSlice text;
+    StrView text;
 } Token;
 
-Lexer ksh_lexer_new(StrSlice ss);
+Lexer ksh_lexer_new(StrView sv);
 
 const char *ksh_lexer_token_type_to_string(TokenType token_type);
 void ksh_lexer_inc(Lexer *l, size_t inc);

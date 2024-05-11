@@ -5,24 +5,22 @@
 
 int echo_fn(size_t argc, CommandArg argv[argc])
 {
-    printf("Message: ");
-    strslice_print(argv[0].value.as_str, stdout);
-    putchar('\n');
+    printf("Message: "STRV_FMT, STRV_ARG(argv[0].value.as_str));
     return 1;
 }
 
 int main(void)
 {
     Command echo = {
-        .name = (StrSlice){ .items = "echo", .len = 4 },
+        .name = STRV_LIT("echo"),
         .desc = "Print message",
         .fn = echo_fn,
         .expected_args = (CommandArg[]){
             {
-                .name = (StrSlice){ .items = "msg", .len = 3 },
+                .name = STRV_LIT("msg"),
                 .usage = "Message that will been printing",
                 .value.kind = COMMAND_ARG_VAL_KIND_STR,
-                .value.as_str = (StrSlice){ .items = "Hello, World", .len = 12 }
+                .value.as_str = STRV_LIT("All hail Britania!!!")
             }
         },
         .expected_args_len = 1
@@ -30,8 +28,7 @@ int main(void)
     ksh_command_print(echo);
     ksh_commands_add(echo);
 
-    const char *text = "echo msg=100";
-    StrSlice line = { .items = text, .len = strlen(text) };
+    StrView line = STRV_LIT("echo msg=");
     Lexer lexer = ksh_lexer_new(line);
 
     if (ksh_parse_lexer(&lexer) != KSH_ERR_OK) {
