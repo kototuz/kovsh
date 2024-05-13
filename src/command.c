@@ -1,125 +1,154 @@
 #include "kovsh.h"
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #ifndef MAX_COMMANDS_LEN
 #   define MAX_COMMANDS_LEN 100
 #endif
 
-static Command commands[MAX_COMMANDS_LEN] = {0};
-static int command_cursor = 0;
+static Command cmds[MAX_COMMANDS_LEN] = {0};
+static int cmd_cursor = 0;
 
-Command ksh_command_new(CommandOpt opt)
+static KshErr handle_arg_assignment(Arg *arg)
 {
-    assert(opt.name != 0);
-    assert(opt.fn != 0);
+    if (!arg->is_assign) {
+        if (arg->def->has_default) {
+            arg->value = arg->def->default_val;
+        } else {
+            KSH_LOG_ERR("arg `"STRV_FMT"` must be assigned", STRV_ARG(arg->def->name));
+            return KSH_ERR_ASSIGNMENT_EXPECTED;
+        }
+    }
 
-    return (Command){
-        .name = strv_new(opt.name, strlen(opt.name)),
-        .desc = opt.desc ? opt.desc : "None",
-        .fn = opt.fn,
-        .argv = opt.argv,
-        .argc = opt.argc
-    };
+    return KSH_ERR_OK;
 }
 
-CommandArg ksh_commandarg_new(CommandArgOpt opt)
+Arg *cmd_call_find_arg(CommandCall cmd_call, StrView arg_name)
 {
-    assert(opt.name != 0);
+    for (size_t i = 0; i < cmd_call.argc; i++) {
+        if (strv_eq(cmd_call.argv[i].def->name, arg_name)) {
+            return &cmd_call.argv[i];
+        }
+    }
 
-    return (CommandArg) {
-        .name = strv_new(opt.name, strlen(opt.name)),
-        .usage = opt.usage ? opt.usage : "None",
-        .value = opt.value,
-    };
+    return NULL;
 }
 
-Command *ksh_commands_add(Command cmd)
+Command *ksh_cmds_add(Command cmd)
 {
-    assert(command_cursor < MAX_COMMANDS_LEN);
-    commands[command_cursor] = cmd;
-    return &commands[command_cursor++];
+    assert(cmd_cursor < MAX_COMMANDS_LEN);
+    assert(cmd.name.items);
+    assert(cmd.fn);
+
+    for (size_t i = 0; i < cmd.arg_defs_len; i++) {
+        assert(cmd.arg_defs[i].name.items);
+        if (cmd.arg_defs[i].usage == 0) {
+            cmd.arg_defs[i].usage = "None";
+        }
+    }
+
+    if (cmd.desc == 0) {
+        cmd.desc = "None";
+    }
+
+    cmds[cmd_cursor] = cmd;
+    return &cmds[cmd_cursor++];
 }
 
-void ksh_command_print(Command cmd)
+void ksh_cmd_print(Command cmd)
 {
     printf("[COMMAND]:\t"STRV_FMT"\n", STRV_ARG(cmd.name));
     printf("[DESCRIPTION]:\t%s\n", cmd.desc);
     puts("[ARGS]:");
-    for (size_t i = 0; i < cmd.argc; i++) {
-        ksh_commandarg_print(cmd.argv[i]);
+    for (size_t i = 0; i < cmd.arg_defs_len; i++) {
+        ksh_arg_def_print(cmd.arg_defs[i]);
     }
 }
 
-Command *ksh_command_find(StrView sv)
+Command *ksh_cmd_find(StrView sv)
 {
     for (size_t i = 0; i < MAX_COMMANDS_LEN; i++) {
-        if (strv_eq(sv, commands[i].name)) {
-            return &commands[i];
+        if (strv_eq(sv, cmds[i].name)) {
+            return &cmds[i];
         }
     }
 
     return NULL;
 }
 
-CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrView ss)
+ArgDef *ksh_cmd_find_arg_def(Command *cmd, StrView sv)
 {
-    for (size_t i = 0; i < len; i++) {
-        if (strv_eq(ss, args[i].name)) {
-            return &args[i];
+    ArgDef *arg_defs = cmd->arg_defs;
+    size_t arg_defs_len = cmd->arg_defs_len;
+    for (size_t i = 0; i < arg_defs_len; i++) {
+        if (strv_eq(sv, arg_defs[i].name)) {
+            return &arg_defs[i];
         }
     }
 
     return NULL;
 }
 
-void ksh_commandarg_print(CommandArg arg)
+void ksh_arg_def_print(ArgDef arg)
 {
     printf("\t"STRV_FMT"=<%s>\t%s\n",
            STRV_ARG(arg.name),
-           ksh_commandargvalkind_to_str(arg.value.kind),
+           ksh_arg_val_type_to_str(arg.type),
            arg.usage);
 }
 
-const char *ksh_commandargvalkind_to_str(CommandArgValKind cavt)
+const char *ksh_arg_val_type_to_str(ArgValType cavt)
 {
     switch (cavt) {
-    case COMMAND_ARG_VAL_KIND_STR: return "string";
-    case COMMAND_ARG_VAL_KIND_INT: return "integer";
-    case COMMAND_ARG_VAL_KIND_BOOL: return "bool";
+    case ARG_VAL_TYPE_STR: return "string";
+    case ARG_VAL_TYPE_INT: return "integer";
+    case ARG_VAL_TYPE_BOOL: return "bool";
     default: return "unknown";
     }
 }
 
-CommandCall ksh_command_create_call(Command *cmd)
+CommandCall ksh_cmd_create_call(Command *cmd)
 {
-    return (CommandCall){
-        .fn = cmd->fn,
-        .argc = cmd->argc,
-        .argv = cmd->argv
+    size_t args_len = cmd->arg_defs_len;
+    CommandCall res = {
+        .cmd = cmd,
+        .argv = malloc(sizeof(Arg) * args_len),
+        .argc = args_len
     };
+
+    if (res.argv == NULL) {
+        fputs("ERROR: could not allocate memmory\n", stderr);
+        exit(1);
+    }
+
+    ArgDef *arg_defs = cmd->arg_defs;
+    for (size_t i = 0; i < args_len; i++) {
+        res.argv[i] = (Arg){ .def = &arg_defs[i] };
+    }
+
+    return res;
 }
 
-KshErr ksh_commandcall_set_arg(CommandCall *cmd_call, StrView arg_name, CommandArgVal value)
+KshErr ksh_cmd_call_exec(CommandCall cmd_call)
 {
-    CommandArg *arg = ksh_commandarg_find(cmd_call->argc, cmd_call->argv, arg_name);
-    if (arg == NULL) {
-        KSH_LOG_ERR("arg not found: "STRV_FMT, STRV_ARG(arg_name));
-        return KSH_ERR_ARG_NOT_FOUND;
+    for (size_t i = 0; i < cmd_call.argc; i++) {
+        KshErr err = handle_arg_assignment(&cmd_call.argv[i]);
+        if (err != KSH_ERR_OK) return err;
     }
 
-    if (arg->value.kind != value.kind) {
-        KSH_LOG_ERR("the `"STRV_FMT"` argument type is %s",
-                    STRV_ARG(arg->name),
-                    ksh_commandargvalkind_to_str(arg->value.kind));
-        return KSH_ERR_TYPE_EXPECTED;
-    }
-
-    arg->value = value;
+    cmd_call.cmd->fn(cmd_call.argc, cmd_call.argv);
+    free(cmd_call.argv);
     return KSH_ERR_OK;
 }
 
-void ksh_commandcall_exec(CommandCall cmd_call)
+Arg *ksh_args_find(size_t argc, Arg argv[argc], StrView sv)
 {
-    cmd_call.fn(cmd_call.argc, cmd_call.argv);
+    for (size_t i = 0; i < argc; i++) {
+        if (strv_eq(argv[i].def->name, sv)) {
+            return &argv[i];
+        }
+    }
+
+    return NULL;
 }

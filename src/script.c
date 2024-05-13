@@ -13,6 +13,8 @@ static Token token_string_make_fn(Lexer *);
 static Token token_number_make_fn(Lexer *);
 static Token token_one_letter_make_fn(Lexer *l);
 
+static bool token_type_expect_arg_val_type(TokenType tt, ArgValType avt);
+
 static const TokenMakeFn TOKEN_MAKE_FUNCTIONS[] = {
     [TOKEN_TYPE_LIT] = token_lit_make_fn,
     [TOKEN_TYPE_STRING] = token_string_make_fn,
@@ -116,37 +118,40 @@ bool ksh_lexer_is_token_next(Lexer *l, TokenType t)
     return ksh_lexer_compute_token_type(l) == t;
 }
 
-CommandArgVal ksh_token_parse_to_arg_val(Token token)
+KshErr ksh_token_parse_to_arg(Token token, Arg *arg)
 {
-    CommandArgVal result = {0};
+    if (!token_type_expect_arg_val_type(token.type, arg->def->type)) {
+        KSH_LOG_ERR("type expected: the `"STRV_FMT"` arg expected value type `%s`",
+                    STRV_ARG(arg->def->name),
+                    ksh_arg_val_type_to_str(arg->def->type));
+        return KSH_ERR_TYPE_EXPECTED;
+    }
+
     switch (token.type) {
     case TOKEN_TYPE_LIT:
-        result.kind = COMMAND_ARG_VAL_KIND_STR;
-        result.as_str = token.text;
+        arg->value.as_str = token.text;
         break;
     case TOKEN_TYPE_STRING:
-        result.kind = COMMAND_ARG_VAL_KIND_STR;
-        result.as_str = (StrView){
+        arg->value.as_str = (StrView){
             .items = token.text.items+1,
             .len = token.text.len-2,
         };
         break;
-    case TOKEN_TYPE_NUMBER:
-        result.kind = COMMAND_ARG_VAL_KIND_INT;
+    case TOKEN_TYPE_NUMBER:;
         char *buf = malloc(token.text.len);
         memcpy(buf, token.text.items, token.text.len);
-        result.as_int = atoi(buf);
+        arg->value.as_int = atoi(buf);
         free(buf);
         break;
     case TOKEN_TYPE_BOOL:
-        result.kind = COMMAND_ARG_VAL_KIND_BOOL;
-        result.as_bool = token.text.items[0] == 't' ? true : false;
+        arg->value.as_bool = token.text.items[0] == 't' ? true : false;
         break;
     default:
         assert(0 && "not yet implemented");
     }
 
-    return result;
+    arg->is_assign = true;
+    return KSH_ERR_OK;
 }
 
 KshErr ksh_parse_lexer(Lexer *l)
@@ -157,13 +162,13 @@ KshErr ksh_parse_lexer(Lexer *l)
     err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &cmd_token);
     if (err != KSH_ERR_OK) return err;
 
-    Command *cmd = ksh_command_find(cmd_token.text);
+    Command *cmd = ksh_cmd_find(cmd_token.text);
     if (cmd == NULL) {
-        KSH_LOG_ERR("command not found: "STRV_FMT, STRV_ARG(cmd_token.text));
+        KSH_LOG_ERR("command not found: `"STRV_FMT"`", STRV_ARG(cmd_token.text));
         return KSH_ERR_COMMAND_NOT_FOUND;
     }
 
-    CommandCall cmd_call = ksh_command_create_call(cmd);
+    CommandCall cmd_call = ksh_cmd_create_call(cmd);
 
     TokenType next = ksh_lexer_compute_token_type(l);
     while (next == TOKEN_TYPE_LIT) {
@@ -171,20 +176,27 @@ KshErr ksh_parse_lexer(Lexer *l)
         err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &arg_name);
         if (err != KSH_ERR_OK) return err;
 
+        Arg *arg = ksh_args_find(cmd_call.argc, cmd_call.argv, arg_name.text);
+        if (arg == NULL) {
+            KSH_LOG_ERR("arg not found: `"STRV_FMT"`", STRV_ARG(arg_name.text));
+            return KSH_ERR_ARG_NOT_FOUND;
+        }
+
         Token eq;
         err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_EQ, &eq);
         if (err != KSH_ERR_OK) return err;
 
         Token token = ksh_lexer_next_token(l);
-        CommandArgVal arg_value = ksh_token_parse_to_arg_val(token);
 
-        err = ksh_commandcall_set_arg(&cmd_call, arg_name.text, arg_value);
+        err = ksh_token_parse_to_arg(token, arg);
         if (err != KSH_ERR_OK) return err;
 
         next = ksh_lexer_compute_token_type(l);
     }
 
-    ksh_commandcall_exec(cmd_call);
+    err = ksh_cmd_call_exec(cmd_call);
+    if (err != KSH_ERR_OK) return err;
+
     return KSH_ERR_OK;
 }
 
@@ -197,6 +209,7 @@ static void lexer_trim(Lexer *self) {
 static bool is_lit(int letter)
 {
     return ('a' <= letter && letter <= 'z')
+           || ('A' <= letter && letter <= 'Z')
            || ('0' <= letter && letter <= '9');
 }
 
@@ -270,4 +283,23 @@ static Token token_one_letter_make_fn(Lexer *l)
         .text.items = &l->text.items[l->cursor],
         .text.len = 1
     };
+}
+
+static bool token_type_expect_arg_val_type(TokenType tt, ArgValType avt)
+{
+    switch (tt) {
+    case TOKEN_TYPE_STRING:
+    case TOKEN_TYPE_LIT:
+        if (avt != ARG_VAL_TYPE_STR) return false;
+        break;
+    case TOKEN_TYPE_NUMBER:
+        if (avt != ARG_VAL_TYPE_INT) return false;
+        break;
+    case TOKEN_TYPE_BOOL:
+        if (avt != ARG_VAL_TYPE_INT) return false;
+        break;
+    default: return false;
+    }
+
+    return true;
 }

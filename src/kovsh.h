@@ -14,7 +14,8 @@ typedef enum {
     KSH_ERR_COMMAND_NOT_FOUND,
     KSH_ERR_ARG_NOT_FOUND,
     KSH_ERR_TOKEN_EXPECTED,
-    KSH_ERR_TYPE_EXPECTED
+    KSH_ERR_TYPE_EXPECTED,
+    KSH_ERR_ASSIGNMENT_EXPECTED,
 } KshErr;
 
 const char *ksh_err_str(KshErr err);
@@ -23,7 +24,6 @@ typedef struct {
     size_t len;
     const char *items;
 } StrView;
-
 #define STRV_LIT(lit) (strv_new(lit, sizeof(lit)-1))
 
 #define STRV_FMT "%.*s"
@@ -37,39 +37,44 @@ bool strv_eq(StrView sv1, StrView sv2);
 //////////////////////////////////////////////
 
 typedef enum {
-    COMMAND_ARG_VAL_KIND_STR,
-    COMMAND_ARG_VAL_KIND_INT,
-    COMMAND_ARG_VAL_KIND_BOOL,
-} CommandArgValKind;
+    ARG_VAL_TYPE_STR,
+    ARG_VAL_TYPE_INT,
+    ARG_VAL_TYPE_BOOL,
+} ArgValType;
 
-typedef struct {
-    CommandArgValKind kind;
-    union {
-        StrView as_str;
-        int as_int;
-        bool as_bool;
-    };
-} CommandArgVal;
+typedef union {
+    StrView as_str;
+    int as_int;
+    bool as_bool;
+} ArgVal; 
 
 typedef struct {
     StrView name;
     const char *usage;
-    CommandArgVal value;
-} CommandArg;
+    bool has_default;
+    ArgValType type;
+    ArgVal default_val;
+} ArgDef;
 
-typedef int (*CommandFn)(size_t argc, CommandArg argv[argc]);
+typedef struct {
+    ArgDef *def;
+    bool is_assign;
+    ArgVal value;
+} Arg;
+
+typedef int (*CommandFn)(size_t argc, Arg argv[argc]);
 
 typedef struct {
     StrView name;
     const char *desc;
     CommandFn fn;
-    CommandArg *argv;
-    size_t argc;
+    ArgDef *arg_defs;
+    size_t arg_defs_len;
 } Command;
 
 typedef struct {
-    CommandFn fn;
-    CommandArg *argv;
+    Command *cmd;
+    Arg *argv;
     size_t argc;
 } CommandCall;
 
@@ -78,35 +83,19 @@ typedef struct {
     size_t len;
 } CommandBuff;
 
-typedef struct {
-    const char *name;
-    const char *desc;
-    CommandFn fn;
-    CommandArg *argv;
-    size_t argc;
-} CommandOpt;
+Command *ksh_cmds_add(Command cmd);
 
-typedef struct {
-    const char *name;
-    const char *usage;
-    CommandArgVal value;
-} CommandArgOpt;
+void ksh_cmd_print(Command cmd);
+Command *ksh_cmd_find(StrView sv);
+CommandCall ksh_cmd_create_call(Command *cmd);
+ArgDef *ksh_cmd_find_arg_def(Command *cmd, StrView name);
 
-Command ksh_command_new(CommandOpt opt);
-Command *ksh_commands_add(Command cmd);
+KshErr ksh_cmd_call_exec(CommandCall call);
 
-void ksh_command_print(Command cmd);
-Command *ksh_command_find(StrView sv);
-CommandCall ksh_command_create_call(Command *cmd);
+const char *ksh_arg_val_type_to_str(ArgValType avt);
+void ksh_arg_def_print(ArgDef cmd_arg);
 
-KshErr ksh_commandcall_set_arg(CommandCall *cmd_call, StrView arg_name, CommandArgVal value);
-void ksh_commandcall_exec(CommandCall call);
-
-CommandArg ksh_commandarg_new(CommandArgOpt);
-const char *ksh_commandargvalkind_to_str(CommandArgValKind cavt);
-void ksh_commandarg_print(CommandArg cmd_arg);
-CommandArg *ksh_commandarg_find(size_t len, CommandArg args[len], StrView sv);
-
+Arg *ksh_args_find(size_t argc, Arg argv[argc], StrView sv);
 
 ///////////////////////////////////////////////
 /// LEXER
@@ -143,7 +132,7 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
 Token ksh_lexer_next_token(Lexer *l);
 bool  ksh_lexer_is_token_next(Lexer *l, TokenType t);
 
-CommandArgVal ksh_token_parse_to_arg_val(Token token);
+KshErr ksh_token_parse_to_arg(Token token, Arg *arg);
 KshErr ksh_parse_lexer(Lexer *l);
 
 #endif
