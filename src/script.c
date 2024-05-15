@@ -59,6 +59,8 @@ TokenType ksh_lexer_compute_token_type(Lexer *l)
     switch (letter) {
     case '=': return TOKEN_TYPE_EQ;
     case '"': return TOKEN_TYPE_STRING;
+
+    case '\n':
     case '\0': return TOKEN_TYPE_END;
     }
 
