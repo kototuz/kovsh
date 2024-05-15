@@ -131,7 +131,7 @@ Token ksh_lexer_next_token(Lexer *l);
 bool  ksh_lexer_is_token_next(Lexer *l, TokenType t);
 
 KshErr ksh_token_parse_to_arg(Token token, Arg *arg);
-KshErr ksh_parse_lexer(Lexer *l);
+KshErr ksh_parse_lexer(CommandBuf cmd_buf, Lexer *l);
 
 
 ///////////////////////////////////////////////

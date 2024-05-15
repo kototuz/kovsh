@@ -156,7 +156,7 @@ KshErr ksh_token_parse_to_arg(Token token, Arg *arg)
     return KSH_ERR_OK;
 }
 
-KshErr ksh_parse_lexer(Lexer *l)
+KshErr ksh_parse_lexer(CommandBuf cmd_buf, Lexer *l)
 {
     KshErr err;
 
@@ -164,7 +164,7 @@ KshErr ksh_parse_lexer(Lexer *l)
     err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &cmd_token);
     if (err != KSH_ERR_OK) return err;
 
-    Command *cmd = ksh_cmd_find(cmd_token.text);
+    Command *cmd = ksh_cmd_find(cmd_buf, cmd_token.text);
     if (cmd == NULL) {
         KSH_LOG_ERR("command not found: `"STRV_FMT"`", STRV_ARG(cmd_token.text));
         return KSH_ERR_COMMAND_NOT_FOUND;
