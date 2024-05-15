@@ -1,5 +1,7 @@
 #include "kovsh.h"
 #include <assert.h>
+#include <stdio.h>
+#include <string.h>
 
 static void handle_cmd_buf(CommandBuf buf)
 {
@@ -24,6 +26,16 @@ static void handle_cmd_buf(CommandBuf buf)
 
 void ksh_term_start(Terminal term)
 {
-    (void)term;
-    assert(0 && "not yet implemented");
+    handle_cmd_buf(term.cmd_buf);
+    while (true) {
+        char *line = {0};
+        size_t len = 0;
+
+        printf(term.prompt);
+        if ((getline(&line, &len, stdin)) != -1) {
+            if (strcmp(line, "quit\n") == 0) return;
+            Lexer lex = ksh_lexer_new((StrView){ .items = line, .len = len });
+            ksh_parse_lexer(term.cmd_buf, &lex);
+        }
+    }
 }

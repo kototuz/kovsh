@@ -5,14 +5,32 @@
 
 int echo_fn(size_t argc, Arg argv[argc])
 {
-    for (int i = 0; i < argv[1].value.as_int; i++) {
-        printf("Message: "STRV_FMT"\n", STRV_ARG(argv[0].value.as_str));
-    }
+    printf("Message: "STRV_FMT"\n", STRV_ARG(argv[0].value.as_str));
     return 1;
 }
 
 int main(void)
 {
-    assert(0 && "not yet implemented");
+    Terminal term = {
+        .cmd_buf = (CommandBuf){
+            .items = (Command[]){
+                {
+                    .name = STRV_LIT("echo"),
+                    .fn = echo_fn,
+                    .arg_defs = (ArgDef[]){
+                        {
+                            .name = STRV_LIT("msg"),
+                            .type = ARG_VAL_TYPE_STR
+                        }
+                    },
+                    .arg_defs_len = 1
+                }
+            },
+            .len = 1
+        },
+        .prompt = ">> "
+    };
+    ksh_term_start(term);
+
     return 0;
 }
