@@ -1,13 +1,10 @@
-Brosh - a terminal shell
-========================
-
-Desription
-----------
+# Brosh - a terminal shell
+## Desription
 Kovsh is a terminal shell written is C.
 
-Usage
------
+## Usage
+> Work in progress
 
-TODO:
-- [ ] Embed lua to setting up **Kovsh**
-- [ ] Make tests
+## Feature Features
+- [ ] terminal ui
+- [ ] lua as a way to configure settings
