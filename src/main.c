@@ -34,7 +34,7 @@ int main(void)
     Command *cmd = ksh_cmds_add(echo);
     ksh_cmd_print(*cmd);
 
-    StrView line = STRV_LIT("ech msg=Hello World");
+    StrView line = STRV_LIT("echo msg=Hello");
     Lexer lexer = ksh_lexer_new(line);
 
     KshErr err = ksh_parse_lexer(&lexer);
