@@ -81,7 +81,7 @@ typedef struct {
 typedef struct {
     Command *items;
     size_t len;
-} CommandBuff;
+} CommandBuf;
 
 Command *ksh_cmds_add(Command cmd);
 
@@ -141,7 +141,7 @@ KshErr ksh_parse_lexer(Lexer *l);
 //////////////////////////////////////////////
 
 typedef struct {
-    CommandBuff cmd_buf;
+    CommandBuf cmd_buf;
     const char *prompt;
 } Terminal;
 
