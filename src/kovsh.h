@@ -83,10 +83,8 @@ typedef struct {
     size_t len;
 } CommandBuf;
 
-Command *ksh_cmds_add(Command cmd);
-
 void ksh_cmd_print(Command cmd);
-Command *ksh_cmd_find(StrView sv);
+Command *ksh_cmd_find(CommandBuf buf, StrView sv);
 CommandCall ksh_cmd_create_call(Command *cmd);
 ArgDef *ksh_cmd_find_arg_def(Command *cmd, StrView name);
 

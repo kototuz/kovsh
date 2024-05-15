@@ -3,13 +3,6 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#ifndef MAX_COMMANDS_LEN
-#   define MAX_COMMANDS_LEN 100
-#endif
-
-static Command cmds[MAX_COMMANDS_LEN] = {0};
-static int cmd_cursor = 0;
-
 static KshErr handle_arg_assignment(Arg *arg)
 {
     if (!arg->is_assign) {
@@ -35,27 +28,6 @@ Arg *cmd_call_find_arg(CommandCall cmd_call, StrView arg_name)
     return NULL;
 }
 
-Command *ksh_cmds_add(Command cmd)
-{
-    assert(cmd_cursor < MAX_COMMANDS_LEN);
-    assert(cmd.name.items);
-    assert(cmd.fn);
-
-    for (size_t i = 0; i < cmd.arg_defs_len; i++) {
-        assert(cmd.arg_defs[i].name.items);
-        if (cmd.arg_defs[i].usage == 0) {
-            cmd.arg_defs[i].usage = "None";
-        }
-    }
-
-    if (cmd.desc == 0) {
-        cmd.desc = "None";
-    }
-
-    cmds[cmd_cursor] = cmd;
-    return &cmds[cmd_cursor++];
-}
-
 void ksh_cmd_print(Command cmd)
 {
     printf("[COMMAND]:\t"STRV_FMT"\n", STRV_ARG(cmd.name));
@@ -66,11 +38,11 @@ void ksh_cmd_print(Command cmd)
     }
 }
 
-Command *ksh_cmd_find(StrView sv)
+Command *ksh_cmd_find(CommandBuf buf, StrView sv)
 {
-    for (size_t i = 0; i < MAX_COMMANDS_LEN; i++) {
-        if (strv_eq(sv, cmds[i].name)) {
-            return &cmds[i];
+    for (size_t i = 0; i < buf.len; i++) {
+        if (strv_eq(sv, buf.items[i].name)) {
+            return &buf.items[i];
         }
     }
 
