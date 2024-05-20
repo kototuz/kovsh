@@ -16,6 +16,8 @@ typedef enum {
     KSH_ERR_TOKEN_EXPECTED,
     KSH_ERR_TYPE_EXPECTED,
     KSH_ERR_ASSIGNMENT_EXPECTED,
+    KSH_ERR_MEM_OVER,
+    KSH_ERR_PATTERN_NOT_FOUND
 } KshErr;
 
 const char *ksh_err_str(KshErr err);
@@ -24,7 +26,7 @@ typedef struct {
     size_t len;
     const char *items;
 } StrView;
-#define STRV_LIT(lit) (strv_new(lit, sizeof(lit)-1))
+#define STRV_LIT(lit) { sizeof(lit)-1, (lit) }
 
 #define STRV_FMT "%.*s"
 #define STRV_ARG(sv) (int) (sv).len, (sv).items
@@ -76,6 +78,7 @@ typedef struct {
     Command *cmd;
     Arg *argv;
     size_t argc;
+    size_t last_assigned;
 } CommandCall;
 
 typedef struct {
@@ -99,10 +102,6 @@ Arg *ksh_args_find(size_t argc, Arg argv[argc], StrView sv);
 /// LEXER
 //////////////////////////////////////////////
 
-typedef struct {
-    StrView text;
-    size_t cursor;
-} Lexer;
 
 typedef enum {
     TOKEN_TYPE_LIT,
@@ -113,7 +112,8 @@ typedef enum {
     TOKEN_TYPE_INVALID,
 
     TOKEN_TYPE_END,
-    TOKEN_TYPE_ENUM_END
+    TOKEN_TYPE_ENUM_END,
+    TOKEN_TYPE_PLUS
 } TokenType;
 
 typedef struct {
@@ -121,18 +121,42 @@ typedef struct {
     StrView text;
 } Token;
 
+typedef struct {
+    StrView text;
+    size_t cursor;
+    Token buf;
+} Lexer;
+
+typedef struct {
+    TokenType *seq;
+    size_t seq_len;
+    KshErr (*eval_fn)(Token *toks, CommandCall *cmd_call);
+} TokenPattern;
+
+typedef struct {
+    Token *items;
+    size_t len;
+} TokenSeq;
+
+typedef struct {
+    CommandBuf cmds;
+} ParseInfo;
+
+typedef struct {
+    ParseInfo info;
+    Lexer lex;
+} Parser;
+
 Lexer ksh_lexer_new(StrView sv);
 const char *ksh_lexer_token_type_to_string(TokenType token_type);
-void ksh_lexer_inc(Lexer *l, size_t inc);
-TokenType ksh_lexer_compute_token_type(Lexer *l);
-Token ksh_lexer_make_token(Lexer *l, TokenType tt);
+bool ksh_lexer_peek_token(Lexer *l, Token *t);
+bool ksh_lexer_next_token(Lexer *l, Token *t);
+bool ksh_lexer_is_next_token(Lexer *l, TokenType tt);
 KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
-Token ksh_lexer_next_token(Lexer *l);
-bool  ksh_lexer_is_token_next(Lexer *l, TokenType t);
 
-KshErr ksh_token_parse_to_arg(Token token, Arg *arg);
-KshErr ksh_parse_lexer(CommandBuf cmd_buf, Lexer *l);
+ArgVal ksh_token_to_arg_val(Token tok);
 
+KshErr ksh_parse(Parser *p);
 
 ///////////////////////////////////////////////
 /// TERM

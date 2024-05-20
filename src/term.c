@@ -35,7 +35,7 @@ void ksh_term_start(Terminal term)
         if ((getline(&line, &len, stdin)) != -1) {
             if (strcmp(line, "quit\n") == 0) return;
             Lexer lex = ksh_lexer_new((StrView){ .items = line, .len = len });
-            ksh_parse_lexer(term.cmd_buf, &lex);
+            ksh_parse(&(Parser){ .info.cmds = term.cmd_buf, .lex = lex });
         }
     }
 }
