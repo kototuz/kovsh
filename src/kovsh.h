@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <assert.h>
 
 #define KSH_LOG_ERR(msg, ...) fprintf(stderr, "[KOVSH ERR]: "msg"\n", __VA_ARGS__)
 
@@ -163,10 +165,44 @@ KshErr ksh_parse(Parser *p);
 /// TERM
 //////////////////////////////////////////////
 
+typedef enum {
+    TERM_COLOR_BLACK = 1,
+    TERM_COLOR_RED,
+    TERM_COLOR_GREEN,
+    TERM_COLOR_YELLOW,
+    TERM_COLOR_BLUE,
+    TERM_COLOR_MAGENTA,
+    TERM_COLOR_CYAN,
+} TermColor;
+
+typedef struct {
+    bool bold;
+    bool italic;
+    bool underscored;
+    bool blink;
+    bool strikethrough;
+} TermTextMode;
+
+typedef struct {
+    const char *text;
+    struct {
+        TermColor fg_color;
+        TermColor bg_color;
+        TermTextMode mode;
+    } text_prefs;
+} PromptPart;
+
+typedef struct {
+    PromptPart *parts;
+    size_t parts_len;
+} Prompt;
+
 typedef struct {
     CommandBuf cmd_buf;
-    const char *prompt;
+    Prompt prompt;
 } Terminal;
+
+void ksh_prompt_print(Prompt p);
 
 void ksh_term_start(Terminal term);
 
