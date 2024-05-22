@@ -152,6 +152,7 @@ const char *ksh_lexer_token_type_to_string(TokenType token_type);
 bool ksh_lexer_peek_token(Lexer *l, Token *t);
 bool ksh_lexer_next_token(Lexer *l, Token *t);
 bool ksh_lexer_is_next_token(Lexer *l, TokenType tt);
+bool ksh_lexer_next_token_if(Lexer *l, TokenType tt, Token *t);
 KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
 
 ArgVal ksh_token_to_arg_val(Token tok);

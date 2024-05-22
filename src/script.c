@@ -106,6 +106,18 @@ bool ksh_lexer_is_next_token(Lexer *l, TokenType tt)
     return false;
 }
 
+bool ksh_lexer_next_token_if(Lexer *l, TokenType tt, Token *t)
+{
+    if (ksh_lexer_peek_token(l, t) &&
+        t->type == tt) {
+        lexer_inc(l, t->text.len);
+        l->buf = (Token){0};
+        return true;
+    }
+
+    return false;
+}
+
 KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
 {
     if (!ksh_lexer_next_token(l, out)
@@ -322,14 +334,13 @@ static KshErr args_eval_fn(Parser *p, CommandCall *ctx)
     Arg *arg;
     Token arg_name;
     Token arg_val;
-    while (ksh_lexer_peek_token(&p->lex, &arg_name)
-           && arg_name.type != TOKEN_TYPE_PLUS) {
+    while (ksh_lexer_peek_token(&p->lex, &arg_name) &&
+           arg_name.type != TOKEN_TYPE_PLUS) {
         ksh_lexer_next_token(&p->lex, &arg_name);
-        if (arg_name.type == TOKEN_TYPE_LIT
-            && ksh_lexer_peek_token(&p->lex, &arg_val)
-            && arg_val.type == TOKEN_TYPE_EQ
-            && ksh_lexer_next_token(&p->lex, &arg_val)
-            && ksh_lexer_next_token(&p->lex, &arg_val)) {
+        if (arg_name.type == TOKEN_TYPE_LIT &&
+            ksh_lexer_next_token_if(&p->lex, TOKEN_TYPE_EQ, &arg_val) &&
+            ksh_lexer_next_token(&p->lex, &arg_val))
+        {
             arg = ksh_args_find(ctx->argc, ctx->argv, arg_name.text);
             ctx->last_assigned = (arg - ctx->argv) / sizeof(*arg);
         } else {
