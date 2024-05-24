@@ -342,7 +342,7 @@ static KshErr args_eval_fn(Parser *p, CommandCall *ctx)
             ksh_lexer_next_token(&p->lex, &arg_val))
         {
             arg = ksh_args_find(ctx->argc, ctx->argv, arg_name.text);
-            ctx->last_assigned = (arg - ctx->argv) / sizeof(*arg);
+            ctx->last_assigned = arg - ctx->argv + 1;
         } else {
             if (ctx->last_assigned >= ctx->argc) {
                 KSH_LOG_ERR("last arg not found%s", "");

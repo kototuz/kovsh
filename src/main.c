@@ -45,12 +45,12 @@ int main(void)
         .prompt.parts = (PromptPart[]){
             {
                 .text = login,
-                .text_prefs.mode.blink = true,
+                .text_prefs.mode.italic = true,
                 .text_prefs.fg_color = TERM_COLOR_GREEN
             },
             {
                 .text = "> ",
-                .text_prefs.mode.blink = true,
+                .text_prefs.mode.italic = true,
                 .text_prefs.fg_color = TERM_COLOR_GREEN
             }
         }
