@@ -1,6 +1,6 @@
 # Kovsh - a terminal shell
 ## Desription
-Kovsh is a terminal shell written is C.
+Kovsh is a terminal shell written in C.
 
 ## Usage
 > Work in progress
