@@ -3,8 +3,8 @@ cflags := -Wall -Wextra -pedantic -g
 
 main:=src/main.c
 
-bin_dir:=zig-out/bin
-obj_dir:=zig-out/objs
+bin_dir:=out/bin
+obj_dir:=out/objs
 
 sources:=$(wildcard src/*.c)
 sources:=$(subst $(main),,$(sources))

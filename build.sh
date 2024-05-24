@@ -6,8 +6,8 @@ mkdir -p zig-out/bin
 cc=gcc
 main=src/main.c
 sources=src/*.c
-obj_dir=zig-out/objs
-bin_dir=zig-out/bin
+obj_dir=out/objs
+bin_dir=out/bin
 
 function build_obj {
     if [ $# -eq 1 ]; then
