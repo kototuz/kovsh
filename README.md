@@ -1,4 +1,4 @@
-# Brosh - a terminal shell
+# Kovsh - a terminal shell
 ## Desription
 Kovsh is a terminal shell written is C.
 
