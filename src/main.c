@@ -7,7 +7,7 @@
 int echo_fn(size_t argc, Arg argv[argc])
 {
     for (int i = 0; i < argv[1].value.as_int; i++) {
-        printf("Message: "STRV_FMT"\n", STRV_ARG(argv[0].value.as_str));
+        ksh_termio_print((TermTextPrefs){0}, "Message: "STRV_FMT"\n", STRV_ARG(argv[0].value.as_str));
     }
 
     return 1;
@@ -45,12 +45,11 @@ int main(void)
         .prompt.parts = (PromptPart[]){
             {
                 .text = login,
-                .text_prefs.mode.italic = true,
+                .text_prefs.mode.bold = true,
                 .text_prefs.fg_color = TERM_COLOR_GREEN
             },
             {
-                .text = "> ",
-                .text_prefs.mode.italic = true,
+                .text = "$ ",
                 .text_prefs.fg_color = TERM_COLOR_GREEN
             }
         }

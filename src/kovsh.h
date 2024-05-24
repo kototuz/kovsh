@@ -6,8 +6,10 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
+#include <stdarg.h>
 
-#define KSH_LOG_ERR(msg, ...) fprintf(stderr, "[KOVSH ERR]: "msg"\n", __VA_ARGS__)
+#define KSH_LOG_ERR(msg, ...) \
+  (ksh_termio_print((TermTextPrefs){.fg_color = TERM_COLOR_RED, .mode.bold = true}, "[KOVSH ERR]: "msg"\n", __VA_ARGS__))
 
 // UTILS
 // ERRORS
@@ -165,6 +167,11 @@ KshErr ksh_parse(Parser *p);
 /// TERM
 //////////////////////////////////////////////
 
+#ifndef TERM_OUT
+#  define TERM_OUT_NCURSES
+#endif
+
+#define TERM_COLOR_COUNT (TERM_COLOR_END-1)
 typedef enum {
     TERM_COLOR_BLACK = 1,
     TERM_COLOR_RED,
@@ -173,8 +180,12 @@ typedef enum {
     TERM_COLOR_BLUE,
     TERM_COLOR_MAGENTA,
     TERM_COLOR_CYAN,
+    TERM_COLOR_WHITE,
+
+    TERM_COLOR_END
 } TermColor;
 
+#define TERM_TEXT_MODE_COUNT 5
 typedef struct {
     bool bold;
     bool italic;
@@ -182,14 +193,17 @@ typedef struct {
     bool blink;
     bool strikethrough;
 } TermTextMode;
+static_assert(TERM_TEXT_MODE_COUNT == (sizeof(TermTextMode) / sizeof(bool)), "unsupported modes");
+
+typedef struct {
+    TermColor fg_color;
+    TermColor bg_color;
+    TermTextMode mode;
+} TermTextPrefs;
 
 typedef struct {
     const char *text;
-    struct {
-        TermColor fg_color;
-        TermColor bg_color;
-        TermTextMode mode;
-    } text_prefs;
+    TermTextPrefs text_prefs;
 } PromptPart;
 
 typedef struct {
@@ -202,8 +216,13 @@ typedef struct {
     Prompt prompt;
 } Terminal;
 
+void ksh_term_start(Terminal term);
+
 void ksh_prompt_print(Prompt p);
 
-void ksh_term_start(Terminal term);
+void ksh_termio_init(void);
+void ksh_termio_print(TermTextPrefs prefs, const char *fmt, ...);
+void ksh_termio_getline(char *buf);
+void ksh_termio_end(void);
 
 #endif

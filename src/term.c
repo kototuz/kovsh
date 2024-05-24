@@ -3,45 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#define FG_COLOR_BEG 29
-#define BG_COLOR_BEG 39
-
-#define MODE_COUNT 5
-#define BOLD_MODE 1
-#define ITALIC_MODE 3
-#define UNDERSCORED_MODE 4
-#define BLINK_MODE 5
-#define STRIKETHROUGH_MODE 9
-
-static const int mode_seq[] = {
-    BOLD_MODE,
-    ITALIC_MODE,
-    UNDERSCORED_MODE,
-    BLINK_MODE,
-    STRIKETHROUGH_MODE,
-};
-
 void ksh_prompt_print(Prompt p)
 {
     for (size_t i = 0; i < p.parts_len; i++) {
-        union {
-            TermTextMode as_mode;
-            bool as_arr[MODE_COUNT];
-        } mode = { .as_mode = p.parts[i].text_prefs.mode };
-
-        printf("\033[0");
-        for (size_t i = 0; i < MODE_COUNT; i++) {
-            if (mode.as_arr[i]) {
-                printf(";%d", mode_seq[i]);
-            }
-        }
-
-        TermColor fg = p.parts[i].text_prefs.fg_color;
-        TermColor bg = p.parts[i].text_prefs.bg_color;
-        if (fg) printf(";%d", FG_COLOR_BEG + fg); 
-        if (bg) printf(";%d", BG_COLOR_BEG + bg);
-
-        printf("m%s\033[0m", p.parts[i].text);
+        ksh_termio_print(p.parts[i].text_prefs, p.parts[i].text);
     }
 }
 
@@ -69,15 +34,19 @@ static void handle_cmd_buf(CommandBuf buf)
 void ksh_term_start(Terminal term)
 {
     handle_cmd_buf(term.cmd_buf);
+    ksh_termio_init();
+
     while (true) {
-        char *line = {0};
-        size_t len = 0;
+#define MAX_LINE 100
+        char line[MAX_LINE];
 
         ksh_prompt_print(term.prompt);
-        if ((getline(&line, &len, stdin)) != -1) {
-            if (strcmp(line, "quit\n") == 0) return;
-            Lexer lex = ksh_lexer_new((StrView){ .items = line, .len = len });
-            ksh_parse(&(Parser){ .info.cmds = term.cmd_buf, .lex = lex });
-        }
+        ksh_termio_getline(line);
+
+        if (strncmp(line, "quit\n", 4) == 0) break;
+        Lexer lex = ksh_lexer_new((StrView){ .items = line, .len = strlen(line) });
+        ksh_parse(&(Parser){ .info.cmds = term.cmd_buf, .lex = lex });
     }
+
+    ksh_termio_end();
 }

@@ -24,7 +24,7 @@ dirs:
 	mkdir -p $(obj_dir)
 
 run: $(main) $(objects)
-	$(cc) $(cflags) -o $(bin_dir)/main $(main) $(objects)
+	$(cc) $(cflags) -o $(bin_dir)/main $(main) $(objects) -lncurses
 	./$(bin_dir)/main
 
 clean:
