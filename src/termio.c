@@ -1,6 +1,6 @@
 #include "kovsh.h"
 
-#ifdef TERM_OUT_NCURSES
+#ifdef TERMIO_NCURSES
 
 #include <ncurses.h>
 
@@ -70,5 +70,5 @@ void ksh_termio_end(void)
   endwin();
 }
 
-#endif // TERM_OUT_NCURSES
+#endif // TERMIO_NCURSES
 

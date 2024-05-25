@@ -2,6 +2,40 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <ncurses.h>
+
+static int echo_fn(size_t argc, Arg argv[argc]);
+static int clear_fn(size_t argc, Arg argv[argc]);
+static int help_fn(size_t argc, Arg argv[argc]);
+
+#define HARDCODED_COMMANDS_COUNT (sizeof(hardcoded_commands) / sizeof(hardcoded_commands[0]))
+static Command hardcoded_commands[] = {
+   { // echo
+        .name = STRV_LIT("echo"),
+        .fn = echo_fn,
+        .arg_defs_len = 2,
+        .arg_defs = (ArgDef[]){
+            {
+                .name = STRV_LIT("msg"),
+                .type = ARG_VAL_TYPE_STR
+            },
+            {
+                .name = STRV_LIT("rep"),
+                .type = ARG_VAL_TYPE_INT,
+                .has_default = true,
+                .default_val.as_int = 1
+            }
+        }
+   },
+   { // clear
+      .name = STRV_LIT("clear"),
+      .fn = clear_fn,
+   },
+   { // help
+      .name = STRV_LIT("help"),
+      .fn = help_fn
+   }
+};
 
 static KshErr handle_arg_assignment(Arg *arg)
 {
@@ -38,7 +72,7 @@ void ksh_cmd_print(Command cmd)
     }
 }
 
-Command *ksh_cmd_find(CommandBuf buf, StrView sv)
+Command *ksh_cmd_find_local(CommandBuf buf, StrView sv)
 {
     for (size_t i = 0; i < buf.len; i++) {
         if (strv_eq(sv, buf.items[i].name)) {
@@ -47,6 +81,24 @@ Command *ksh_cmd_find(CommandBuf buf, StrView sv)
     }
 
     return NULL;
+}
+
+Command *ksh_cmd_find_hardcoded(StrView sv)
+{
+    for (size_t i = 0; i < HARDCODED_COMMANDS_COUNT; i++) {
+        if (strv_eq(sv, hardcoded_commands[i].name)) {
+            return &hardcoded_commands[i];
+        }
+    }
+
+    return NULL;
+}
+
+Command *ksh_cmd_find(CommandBuf buf, StrView sv)
+{
+    Command *cmd = ksh_cmd_find_hardcoded(sv);
+    if (cmd) return cmd;
+    return ksh_cmd_find_local(buf, sv);
 }
 
 ArgDef *ksh_cmd_find_arg_def(Command *cmd, StrView sv)
@@ -124,3 +176,37 @@ Arg *ksh_args_find(size_t argc, Arg argv[argc], StrView sv)
 
     return NULL;
 }
+
+// commands
+#ifdef TERMIO_NCURSES
+static int echo_fn(size_t argc, Arg argv[argc])
+{
+    for (int i = 0; i < argv[1].value.as_int; i++) {
+        ksh_termio_print((TermTextPrefs){0}, STRV_FMT"\n", STRV_ARG(argv[0].value.as_str));
+    }
+
+    return 0;
+}
+
+static int clear_fn(size_t argc, Arg argv[argc])
+{
+    (void)argc;
+    (void)argv;
+    clear();
+    return 0;
+}
+
+static int help_fn(size_t argc, Arg argv[argc])
+{
+    (void)argc;
+    (void)argv;
+    ksh_termio_print(
+        (TermTextPrefs){
+            .fg_color = TERM_COLOR_YELLOW,
+            .mode.bold = true,
+        },
+        "KOVSH is a terminal shell written in C\n"
+    );
+    return 0;
+}
+#endif // TERMIO_NCURSES

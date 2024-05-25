@@ -91,6 +91,8 @@ typedef struct {
 } CommandBuf;
 
 void ksh_cmd_print(Command cmd);
+Command *ksh_cmd_find_local(CommandBuf buf, StrView sv);
+Command *ksh_cmd_find_hardcoded(StrView sv);
 Command *ksh_cmd_find(CommandBuf buf, StrView sv);
 CommandCall ksh_cmd_create_call(Command *cmd);
 ArgDef *ksh_cmd_find_arg_def(Command *cmd, StrView name);
@@ -167,8 +169,8 @@ KshErr ksh_parse(Parser *p);
 /// TERM
 //////////////////////////////////////////////
 
-#ifndef TERM_OUT
-#  define TERM_OUT_NCURSES
+#ifndef TERMIO
+#  define TERMIO_NCURSES
 #endif
 
 #define TERM_COLOR_COUNT (TERM_COLOR_END-1)
