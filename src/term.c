@@ -41,7 +41,7 @@ void ksh_term_start(Terminal term)
         char line[MAX_LINE];
 
         ksh_prompt_print(term.prompt);
-        ksh_termio_getline(line);
+        ksh_termio_getline(MAX_LINE, line);
 
         if (strncmp(line, "quit\n", 4) == 0) break;
         Lexer lex = ksh_lexer_new((StrView){ .items = line, .len = strlen(line) });

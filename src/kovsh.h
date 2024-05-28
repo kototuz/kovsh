@@ -170,7 +170,7 @@ KshErr ksh_parse(Parser *p);
 //////////////////////////////////////////////
 
 #ifndef TERMIO
-#  define TERMIO_NCURSES
+#  define TERMIO_DEFAULT
 #endif
 
 #define TERM_COLOR_COUNT (TERM_COLOR_END-1)
@@ -224,7 +224,7 @@ void ksh_prompt_print(Prompt p);
 
 void ksh_termio_init(void);
 void ksh_termio_print(TermTextPrefs prefs, const char *fmt, ...);
-void ksh_termio_getline(char *buf);
+void ksh_termio_getline(size_t size, char buf[size]);
 void ksh_termio_end(void);
 
 #endif

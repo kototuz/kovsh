@@ -18,7 +18,7 @@ void ksh_termio_init(void)
     initscr();
 }
 
-void ksh_termio_getline(char *buf)
+void ksh_termio_getline(size_t size, char buf[size])
 {
     getstr(buf);
 }
@@ -69,6 +69,29 @@ void ksh_termio_end(void)
 {
     endwin();
 }
+#elif defined(TERMIO_DEFAULT)
 
-#endif // TERMIO_NCURSES
+void ksh_termio_init(void) {}
+void ksh_termio_end(void) {}
+
+void
+ksh_termio_print(TermTextPrefs prefs, const char *fmt, ...)
+{
+#warning "Text preferences are not available in TERMIO_DEFAULT now"
+    (void) prefs;
+    va_list args;
+    va_start(args, fmt);
+
+    vprintf(fmt, args);
+
+    va_end(args);
+}
+
+void
+ksh_termio_getline(size_t size, char buf[size])
+{
+    fgets(buf, size, stdin);
+}
+
+#endif // TERMIO
 
