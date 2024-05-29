@@ -14,28 +14,72 @@ static void lexer_trim(Lexer *l);
 static bool is_lit(int letter);
 static bool is_dig(int s) { return isdigit(s); }
 
-static bool make_string_token(StrView sv, Token *out);
-static bool make_static_token(StrView sv, Token *out);
-static bool make_variety_token(StrView sv, Token *out);
 
 static bool token_type_expect_arg_val_type(TokenType tt, ArgValType avt);
 
-static const struct {
-    TokenType type;
-    StrView text;
-} static_tokens[] = {
-    { .type = TOKEN_TYPE_EQ, .text = STRV_LIT("=") },
-    { .type = TOKEN_TYPE_BOOL, .text = STRV_LIT("true") },
-    { .type = TOKEN_TYPE_BOOL, .text = STRV_LIT("false") },
-    { .type = TOKEN_TYPE_PLUS, .text = STRV_LIT("+") }
-};
+typedef struct {
+    size_t len;
+    size_t item_size;
+    uint8_t *items;
+} ParseDb;
 
-static const struct {
+typedef struct {
+    TokenType type;
+    StrView word;
+} Keyword;
+
+typedef struct {
+    TokenType type;
+    const char symbol;
+} SpecialSymbol;
+
+typedef struct {
     TokenType type;
     bool (*check_fn)(int s);
-} variety_tokens[] = {
-    { .type = TOKEN_TYPE_NUMBER, .check_fn = is_dig },
-    { .type = TOKEN_TYPE_LIT, .check_fn = is_lit },
+} Variety;
+
+static const ParseDb keyword_db = {
+    .len = 2,
+    .item_size = sizeof(Keyword),
+    .items = (uint8_t *)(Keyword[]){
+        { .type = TOKEN_TYPE_BOOL, .word = STRV_LIT("true") },
+        { .type = TOKEN_TYPE_BOOL, .word = STRV_LIT("false") },
+    },
+};
+
+static const ParseDb special_symbol_db = {
+    .len = 2,
+    .item_size = sizeof(SpecialSymbol),
+    .items = (uint8_t *)(SpecialSymbol[]){
+        { .type = TOKEN_TYPE_EQ, .symbol = '=' },
+        { .type = TOKEN_TYPE_PLUS, .symbol = '+' }
+    }
+};
+
+static const ParseDb variety_db = {
+    .len = 2,
+    .item_size = sizeof(Variety),
+    .items = (uint8_t *)(Variety[]){
+        { .type = TOKEN_TYPE_NUMBER, .check_fn = is_dig },
+        { .type = TOKEN_TYPE_LIT, .check_fn = is_lit }
+    }
+};
+
+static bool parse_string_token(StrView sv, void *ctx, Token *out);
+static bool parse_variety_token(StrView sv, Variety *ctx, Token *out);
+static bool parse_keyword_token(StrView sv, Keyword *ctx, Token *out);
+static bool parse_spec_sym_token(StrView sv, SpecialSymbol *ctx, Token *out);
+
+typedef bool (*ParseFn)(StrView sv, void *ctx, Token *out);
+
+static const struct TokenParser {
+    const ParseDb db;
+    ParseFn parse_fn;
+} token_parsers[] = {
+    { .db = keyword_db, .parse_fn = (ParseFn) parse_keyword_token },
+    { .db = special_symbol_db, .parse_fn = (ParseFn) parse_spec_sym_token },
+    { .db = variety_db, .parse_fn = (ParseFn) parse_variety_token },
+    { .parse_fn = (ParseFn) parse_string_token }
 };
 
 static KshErr cmd_eval_fn(Parser *p, CommandCall *ctx);
@@ -73,13 +117,27 @@ bool ksh_lexer_peek_token(Lexer *l, Token *t)
 
     Token tok;
     StrView text = { .items = &l->text.items[l->cursor], .len = l->text.len - l->cursor };
-    if (!make_variety_token(text, &tok)
-        && !make_static_token(text, &tok)
-        && !make_string_token(text, &tok)) return false;
-    l->buf = tok;
-    *t = tok;
+    for (size_t i = 0; i < STATIC_ARR_LEN(token_parsers); i++) {
+        struct TokenParser tp = token_parsers[i];
 
-    return true;
+        if (tp.db.len == 0) {
+            if (tp.parse_fn(text, NULL, &tok)) {
+                l->buf = tok;
+                *t = tok;
+                return true;
+            }
+        }
+
+        for (size_t i = 0; i < tp.db.len; i++) {
+            if (tp.parse_fn(text, &tp.db.items[i*tp.db.item_size], &tok)) {
+                l->buf = tok;
+                *t = tok;
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 Lexer ksh_lexer_new(StrView ss)
@@ -216,47 +274,59 @@ KshErr ksh_parse(Parser *p)
 // }
 
 // PRIVATE FUNCTIONS
-static bool make_static_token(StrView sv, Token *out)
+static bool parse_spec_sym_token(StrView sv, SpecialSymbol *spec_sym, Token *out)
 {
-    for (size_t i = 0; i < STATIC_ARR_LEN(static_tokens); i++) {
-        if (sv.len < static_tokens[i].text.len) continue;
-        StrView sv2 = { .items = sv.items, .len = static_tokens[i].text.len };
-        if (strv_eq(sv2, static_tokens[i].text)) {
-            *out = (Token){
-                .text = sv2,
-                .type = static_tokens[i].type
-            };
-            return true;
-        }
-    }
-
-    return false;
-}
-
-static bool make_variety_token(StrView sv, Token *out)
-{
-    for (size_t i = 0; i < STATIC_ARR_LEN(variety_tokens); i++) {
-        bool (*check_fn)(int s) = variety_tokens[i].check_fn; 
-        if (!check_fn(sv.items[0])) continue;
+    if (spec_sym->symbol == sv.items[0]) {
         *out = (Token){
             .text.items = sv.items,
             .text.len = 1,
-            .type = variety_tokens[i].type
+            .type = spec_sym->type
         };
-
-        size_t i;
-        for (i = 1; check_fn(sv.items[i]) && i < sv.len; i++) {
-            out->text.len++;
-        }
-
         return true;
     }
 
     return false;
 }
 
-static bool make_string_token(StrView sv, Token *out)
+static bool parse_keyword_token(StrView sv, Keyword *keyword, Token *out)
 {
+    StrView keyword_sv = keyword->word;
+    if (sv.items[keyword_sv.len] != ' ' &&
+        sv.items[keyword_sv.len] != '\n') return false;
+
+    StrView sv_cat = { .items = sv.items, .len = keyword_sv.len };
+    if (strv_eq(sv_cat, keyword_sv)) {
+        *out = (Token){
+            .text = keyword_sv,
+            .type = keyword->type,
+        };
+        return true;
+    }
+
+    return false;
+}
+
+static bool parse_variety_token(StrView sv, Variety *vari, Token *out)
+{
+    bool (*check_fn)(int s) = vari->check_fn; 
+    if (!check_fn(sv.items[0])) return false;
+
+    *out = (Token){
+        .text.items = sv.items,
+        .text.len = 1,
+        .type = vari->type
+    };
+
+    size_t i;
+    for (i = 1; check_fn(sv.items[i]) && i < sv.len; i++) {}
+    out->text.len = i;
+
+    return true;
+}
+
+static bool parse_string_token(StrView sv, void *ctx, Token *out)
+{
+    (void) ctx;
     if (sv.items[0] != '"') return false;
     for (size_t i = 1; i < sv.len; i++) {
         if (sv.items[i] == '"') {
