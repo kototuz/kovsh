@@ -161,7 +161,9 @@ KshErr ksh_cmd_call_exec(CommandCall cmd_call)
         if (err != KSH_ERR_OK) return err;
     }
 
-    cmd_call.cmd->fn(cmd_call.argc, cmd_call.argv);
+    ksh_termio_print((TermTextPrefs){0}, "COMMAND RESULT: %d\n",
+                     cmd_call.cmd->fn(cmd_call.argc, cmd_call.argv));
+
     free(cmd_call.argv);
     return KSH_ERR_OK;
 }
@@ -178,7 +180,6 @@ Arg *ksh_args_find(size_t argc, Arg argv[argc], StrView sv)
 }
 
 // commands
-#ifdef TERMIO_NCURSES
 static int echo_fn(size_t argc, Arg argv[argc])
 {
     for (int i = 0; i < argv[1].value.as_int; i++) {
@@ -187,7 +188,7 @@ static int echo_fn(size_t argc, Arg argv[argc])
 
     return 0;
 }
-
+#ifdef TERMIO_NCURSES
 static int clear_fn(size_t argc, Arg argv[argc])
 {
     (void)argc;
@@ -195,6 +196,13 @@ static int clear_fn(size_t argc, Arg argv[argc])
     clear();
     return 0;
 }
+#elif defined(TERMIO_DEFAULT)
+static int clear_fn(size_t argc, Arg argv[argc])
+{
+    (void) argc; (void) argv;
+    return 0;
+}
+#endif
 
 static int help_fn(size_t argc, Arg argv[argc])
 {
@@ -209,4 +217,3 @@ static int help_fn(size_t argc, Arg argv[argc])
     );
     return 0;
 }
-#endif // TERMIO_NCURSES
