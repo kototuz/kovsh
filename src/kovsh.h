@@ -82,13 +82,26 @@ typedef struct {
     Command *cmd;
     Arg *argv;
     size_t argc;
-    size_t last_assigned;
 } CommandCall;
+
+typedef enum {
+    COMMAND_CALL_STATE_DEF,
+    COMMAND_CALL_STATE_EXIT,
+    COMMAND_CALL_STATE_SYS,
+} CommandCallState;
 
 typedef struct {
     Command *items;
     size_t len;
 } CommandBuf;
+
+typedef struct {
+    CommandCall cmd_call;
+    CommandCallState state;
+    CommandBuf commands;
+    size_t last_assigned_arg;
+} CallContext;
+
 
 void ksh_cmd_print(Command cmd);
 Command *ksh_cmd_find_local(CommandBuf buf, StrView sv);
@@ -115,6 +128,7 @@ typedef enum {
     TOKEN_TYPE_NUMBER,
     TOKEN_TYPE_BOOL,
     TOKEN_TYPE_EQ,
+    TOKEN_TYPE_KEYWORD_SYS,
     TOKEN_TYPE_INVALID,
 
     TOKEN_TYPE_END,
@@ -163,7 +177,7 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
 
 ArgVal ksh_token_to_arg_val(Token tok);
 
-KshErr ksh_parse(Parser *p);
+KshErr ksh_parse(Lexer *lex, CallContext context);
 
 ///////////////////////////////////////////////
 /// TERM

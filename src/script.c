@@ -14,7 +14,6 @@ static void lexer_trim(Lexer *l);
 static bool is_lit(int letter);
 static bool is_dig(int s) { return isdigit(s); }
 
-
 static bool token_type_expect_arg_val_type(TokenType tt, ArgValType avt);
 
 typedef struct {
@@ -39,11 +38,12 @@ typedef struct {
 } Variety;
 
 static const ParseDb keyword_db = {
-    .len = 2,
+    .len = 3,
     .item_size = sizeof(Keyword),
     .items = (uint8_t *)(Keyword[]){
         { .type = TOKEN_TYPE_BOOL, .word = STRV_LIT("true") },
         { .type = TOKEN_TYPE_BOOL, .word = STRV_LIT("false") },
+        { .type = TOKEN_TYPE_KEYWORD_SYS, .word = STRV_LIT("sys") }
     },
 };
 
@@ -82,13 +82,16 @@ static const struct TokenParser {
     { .parse_fn = (ParseFn) parse_string_token }
 };
 
-static KshErr cmd_eval_fn(Parser *p, CommandCall *ctx);
-static KshErr args_eval_fn(Parser *p, CommandCall *ctx);
+static KshErr mod_eval_fn(Lexer *lex, CallContext *ctx);
+static KshErr cmd_eval_fn(Lexer *lex, CallContext *ctx);
+static KshErr args_eval_fn(Lexer *lex, CallContext *ctx);
 
-typedef KshErr (*CmdCallWorkflowFn)(Parser *p, CommandCall *cmd_call);
+typedef KshErr (*CmdCallWorkflowFn)(Lexer *l, CallContext *ctx);
+
 static const CmdCallWorkflowFn cmd_call_workflow[] = {
+    mod_eval_fn,
     cmd_eval_fn,
-    args_eval_fn
+    args_eval_fn,
 };
 
 // PUBLIC FUNCTIONS
@@ -213,26 +216,28 @@ ArgVal ksh_token_to_arg_val(Token tok)
     return result;
 }
 
-KshErr ksh_parse(Parser *p)
+KshErr ksh_parse(Lexer *lex, CallContext context)
 {
     KshErr err;
-    CommandCall cmd_call;
     for (;;) {
         for (size_t i = 0; i < STATIC_ARR_LEN(cmd_call_workflow); i++) {
-            err = cmd_call_workflow[i](p, &cmd_call);
+            err = cmd_call_workflow[i](lex, &context);
             if (err != KSH_ERR_OK) return err;
+            if (context.state == COMMAND_CALL_STATE_EXIT) {
+                return KSH_ERR_OK;
+            }
         }
 
-        err = ksh_cmd_call_exec(cmd_call);
+        err = ksh_cmd_call_exec(context.cmd_call);
         if (err != KSH_ERR_OK) return err;
 
         Token tok;
-        if (!ksh_lexer_peek_token(&p->lex, &tok)
+        if (!ksh_lexer_peek_token(lex, &tok)
             || tok.type != TOKEN_TYPE_PLUS) {
             break;
         }
 
-        ksh_lexer_next_token(&p->lex, &tok);
+        ksh_lexer_next_token(lex, &tok);
     }
 
     return KSH_ERR_OK;
@@ -379,47 +384,58 @@ static bool token_type_expect_arg_val_type(TokenType tt, ArgValType avt)
     return true;
 }
 
-static KshErr cmd_eval_fn(Parser *p, CommandCall *ctx)
+static KshErr mod_eval_fn(Lexer *l, CallContext *ctx)
 {
     Token tok;
-    KshErr err = ksh_lexer_expect_next_token(&p->lex, TOKEN_TYPE_LIT, &tok);
+    if (ksh_lexer_next_token_if(l, TOKEN_TYPE_KEYWORD_SYS, &tok)) {
+        system(&l->text.items[3]);
+        ctx->state = COMMAND_CALL_STATE_EXIT;
+    }
+
+    return KSH_ERR_OK;
+}
+
+static KshErr cmd_eval_fn(Lexer *l, CallContext *ctx)
+{
+    Token tok;
+
+    KshErr err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &tok);
     if (err != KSH_ERR_OK) return err;
 
-    Command *cmd = ksh_cmd_find(p->info.cmds, tok.text);
+    Command *cmd = ksh_cmd_find(ctx->commands, tok.text);
     if (cmd == NULL) {
         KSH_LOG_ERR("command not found: `"STRV_FMT"`", STRV_ARG(tok.text));
         return KSH_ERR_COMMAND_NOT_FOUND;
     }
 
-    *ctx = ksh_cmd_create_call(cmd);
+    ctx->cmd_call = ksh_cmd_create_call(cmd);
 
     return KSH_ERR_OK;
 }
 
-// TODO: refactor this shit!!!
-static KshErr args_eval_fn(Parser *p, CommandCall *ctx)
+static KshErr args_eval_fn(Lexer *lex, CallContext *ctx)
 {
-    assert(ctx->cmd);
+    assert(ctx->cmd_call.cmd);
 
     Arg *arg;
     Token arg_name;
     Token arg_val;
-    while (ksh_lexer_peek_token(&p->lex, &arg_name) &&
+    while (ksh_lexer_peek_token(lex, &arg_name) &&
            arg_name.type != TOKEN_TYPE_PLUS) {
-        ksh_lexer_next_token(&p->lex, &arg_name);
+        ksh_lexer_next_token(lex, &arg_name);
         if (arg_name.type == TOKEN_TYPE_LIT &&
-            ksh_lexer_next_token_if(&p->lex, TOKEN_TYPE_EQ, &arg_val) &&
-            ksh_lexer_next_token(&p->lex, &arg_val))
+            ksh_lexer_next_token_if(lex, TOKEN_TYPE_EQ, &arg_val) &&
+            ksh_lexer_next_token(lex, &arg_val))
         {
-            arg = ksh_args_find(ctx->argc, ctx->argv, arg_name.text);
-            ctx->last_assigned = arg - ctx->argv + 1;
+            arg = ksh_args_find(ctx->cmd_call.argc, ctx->cmd_call.argv, arg_name.text);
+            ctx->last_assigned_arg = arg - ctx->cmd_call.argv + 1;
         } else {
-            if (ctx->last_assigned >= ctx->argc) {
+            if (ctx->last_assigned_arg >= ctx->cmd_call.argc) {
                 KSH_LOG_ERR("last arg not found%s", "");
                 return KSH_ERR_ARG_NOT_FOUND;
             }
             arg_val = arg_name;
-            arg = &ctx->argv[ctx->last_assigned++];
+            arg = &ctx->cmd_call.argv[ctx->last_assigned_arg++];
         }
 
         if (arg == NULL) {

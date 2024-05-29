@@ -45,7 +45,7 @@ void ksh_term_start(Terminal term)
 
         if (strncmp(line, "quit\n", 4) == 0) break;
         Lexer lex = ksh_lexer_new((StrView){ .items = line, .len = strlen(line) });
-        ksh_parse(&(Parser){ .info.cmds = term.cmd_buf, .lex = lex });
+        ksh_parse(&lex, (CallContext){0});
     }
 
     ksh_termio_end();
