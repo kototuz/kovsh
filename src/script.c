@@ -82,11 +82,11 @@ static const struct TokenParser {
     { .parse_fn = (ParseFn) parse_string_token }
 };
 
-static KshErr mod_eval_fn(Lexer *lex, Terminal *term);
-static KshErr cmd_eval_fn(Lexer *lex, Terminal *term);
-static KshErr args_eval_fn(Lexer *lex, Terminal *term);
+static KshErr mod_eval_fn(Lexer *lex, Terminal *term, bool *exit);
+static KshErr cmd_eval_fn(Lexer *lex, Terminal *term, bool *exit);
+static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit);
 
-typedef KshErr (*CmdCallWorkflowFn)(Lexer *l, Terminal *term);
+typedef KshErr (*CmdCallWorkflowFn)(Lexer *l, Terminal *term, bool *exit);
 
 static const CmdCallWorkflowFn cmd_call_workflow[] = {
     mod_eval_fn,
@@ -100,8 +100,7 @@ const char *ksh_lexer_token_type_to_string(TokenType tt)
     switch (tt) {
     case TOKEN_TYPE_LIT: return "lit";
     case TOKEN_TYPE_STRING: return "string";
-    case TOKEN_TYPE_NUMBER: return "number";
-    case TOKEN_TYPE_BOOL: return "bool";
+    case TOKEN_TYPE_NUMBER: return "number"; case TOKEN_TYPE_BOOL: return "bool";
     case TOKEN_TYPE_EQ: return "eq";
     case TOKEN_TYPE_INVALID: return "invalid";
     default: return "unknown";
@@ -220,9 +219,11 @@ KshErr ksh_parse(Lexer *lex, Terminal *term)
 {
     KshErr err;
     for (;;) {
+        bool exit = false;
         for (size_t i = 0; i < STATIC_ARR_LEN(cmd_call_workflow); i++) {
-            err = cmd_call_workflow[i](lex, term);
+            err = cmd_call_workflow[i](lex, term, &exit);
             if (err != KSH_ERR_OK) return err;
+            if (exit) return KSH_ERR_OK;
         }
 
         err = ksh_cmd_call_exec(term->cur_cmd_call);
@@ -381,9 +382,9 @@ static bool token_type_expect_arg_val_type(TokenType tt, ArgValType avt)
     return true;
 }
 
-static KshErr mod_eval_fn(Lexer *l, Terminal *term)
+static KshErr mod_eval_fn(Lexer *l, Terminal *term, bool *exit)
 {
-    (void) term;
+    (void) term; (void) exit;
     Token tok;
     if (ksh_lexer_next_token_if(l, TOKEN_TYPE_KEYWORD_SYS, &tok)) {
         system(&l->text.items[3]);
@@ -392,9 +393,13 @@ static KshErr mod_eval_fn(Lexer *l, Terminal *term)
     return KSH_ERR_OK;
 }
 
-static KshErr cmd_eval_fn(Lexer *l, Terminal *term)
+static KshErr cmd_eval_fn(Lexer *l, Terminal *term, bool *exit)
 {
     Token tok;
+    if (!ksh_lexer_peek_token(l, &tok)) {
+        *exit = true;
+        return KSH_ERR_OK;
+    }
 
     KshErr err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &tok);
     if (err != KSH_ERR_OK) return err;
@@ -410,8 +415,9 @@ static KshErr cmd_eval_fn(Lexer *l, Terminal *term)
     return KSH_ERR_OK;
 }
 
-static KshErr args_eval_fn(Lexer *lex, Terminal *term)
+static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit)
 {
+    (void) exit;
     assert(term->cur_cmd_call.cmd);
 
     Arg *arg;
