@@ -82,14 +82,12 @@ static const struct TokenParser {
     { .parse_fn = (ParseFn) parse_string_token }
 };
 
-static KshErr mod_eval_fn(Lexer *lex, Terminal *term, bool *exit);
 static KshErr cmd_eval_fn(Lexer *lex, Terminal *term, bool *exit);
 static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit);
 
 typedef KshErr (*CmdCallWorkflowFn)(Lexer *l, Terminal *term, bool *exit);
 
 static const CmdCallWorkflowFn cmd_call_workflow[] = {
-    mod_eval_fn,
     cmd_eval_fn,
     args_eval_fn,
 };
@@ -380,17 +378,6 @@ static bool token_type_expect_arg_val_type(TokenType tt, ArgValType avt)
     }
 
     return true;
-}
-
-static KshErr mod_eval_fn(Lexer *l, Terminal *term, bool *exit)
-{
-    (void) term; (void) exit;
-    Token tok;
-    if (ksh_lexer_next_token_if(l, TOKEN_TYPE_KEYWORD_SYS, &tok)) {
-        system(&l->text.items[3]);
-    }
-
-    return KSH_ERR_OK;
 }
 
 static KshErr cmd_eval_fn(Lexer *l, Terminal *term, bool *exit)
