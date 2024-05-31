@@ -82,11 +82,11 @@ static const struct TokenParser {
     { .parse_fn = (ParseFn) parse_string_token }
 };
 
-static KshErr mod_eval_fn(Lexer *lex, CallContext *ctx);
-static KshErr cmd_eval_fn(Lexer *lex, CallContext *ctx);
-static KshErr args_eval_fn(Lexer *lex, CallContext *ctx);
+static KshErr mod_eval_fn(Lexer *lex, Terminal *term);
+static KshErr cmd_eval_fn(Lexer *lex, Terminal *term);
+static KshErr args_eval_fn(Lexer *lex, Terminal *term);
 
-typedef KshErr (*CmdCallWorkflowFn)(Lexer *l, CallContext *ctx);
+typedef KshErr (*CmdCallWorkflowFn)(Lexer *l, Terminal *term);
 
 static const CmdCallWorkflowFn cmd_call_workflow[] = {
     mod_eval_fn,
@@ -216,19 +216,16 @@ ArgVal ksh_token_to_arg_val(Token tok)
     return result;
 }
 
-KshErr ksh_parse(Lexer *lex, CallContext context)
+KshErr ksh_parse(Lexer *lex, Terminal *term)
 {
     KshErr err;
     for (;;) {
         for (size_t i = 0; i < STATIC_ARR_LEN(cmd_call_workflow); i++) {
-            err = cmd_call_workflow[i](lex, &context);
+            err = cmd_call_workflow[i](lex, term);
             if (err != KSH_ERR_OK) return err;
-            if (context.state == COMMAND_CALL_STATE_EXIT) {
-                return KSH_ERR_OK;
-            }
         }
 
-        err = ksh_cmd_call_exec(context.cmd_call);
+        err = ksh_cmd_call_exec(term->cur_cmd_call);
         if (err != KSH_ERR_OK) return err;
 
         Token tok;
@@ -384,38 +381,38 @@ static bool token_type_expect_arg_val_type(TokenType tt, ArgValType avt)
     return true;
 }
 
-static KshErr mod_eval_fn(Lexer *l, CallContext *ctx)
+static KshErr mod_eval_fn(Lexer *l, Terminal *term)
 {
+    (void) term;
     Token tok;
     if (ksh_lexer_next_token_if(l, TOKEN_TYPE_KEYWORD_SYS, &tok)) {
         system(&l->text.items[3]);
-        ctx->state = COMMAND_CALL_STATE_EXIT;
     }
 
     return KSH_ERR_OK;
 }
 
-static KshErr cmd_eval_fn(Lexer *l, CallContext *ctx)
+static KshErr cmd_eval_fn(Lexer *l, Terminal *term)
 {
     Token tok;
 
     KshErr err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &tok);
     if (err != KSH_ERR_OK) return err;
 
-    Command *cmd = ksh_cmd_find(ctx->commands, tok.text);
+    Command *cmd = ksh_cmd_find(term->commands, tok.text);
     if (cmd == NULL) {
         KSH_LOG_ERR("command not found: `"STRV_FMT"`", STRV_ARG(tok.text));
         return KSH_ERR_COMMAND_NOT_FOUND;
     }
 
-    ctx->cmd_call = ksh_cmd_create_call(cmd);
+    term->cur_cmd_call = ksh_cmd_create_call(cmd);
 
     return KSH_ERR_OK;
 }
 
-static KshErr args_eval_fn(Lexer *lex, CallContext *ctx)
+static KshErr args_eval_fn(Lexer *lex, Terminal *term)
 {
-    assert(ctx->cmd_call.cmd);
+    assert(term->cur_cmd_call.cmd);
 
     Arg *arg;
     Token arg_name;
@@ -427,15 +424,17 @@ static KshErr args_eval_fn(Lexer *lex, CallContext *ctx)
             ksh_lexer_next_token_if(lex, TOKEN_TYPE_EQ, &arg_val) &&
             ksh_lexer_next_token(lex, &arg_val))
         {
-            arg = ksh_args_find(ctx->cmd_call.argc, ctx->cmd_call.argv, arg_name.text);
-            ctx->last_assigned_arg = arg - ctx->cmd_call.argv + 1;
+            arg = ksh_args_find(term->cur_cmd_call.argc,
+                                term->cur_cmd_call.argv,
+                                arg_name.text);
+            term->cur_cmd_call.last_assigned_arg_idx = arg - term->cur_cmd_call.argv + 1;
         } else {
-            if (ctx->last_assigned_arg >= ctx->cmd_call.argc) {
+            if (term->cur_cmd_call.last_assigned_arg_idx >= term->cur_cmd_call.argc) {
                 KSH_LOG_ERR("last arg not found%s", "");
                 return KSH_ERR_ARG_NOT_FOUND;
             }
             arg_val = arg_name;
-            arg = &ctx->cmd_call.argv[ctx->last_assigned_arg++];
+            arg = &term->cur_cmd_call.argv[term->cur_cmd_call.last_assigned_arg_idx++];
         }
 
         if (arg == NULL) {

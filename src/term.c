@@ -33,7 +33,7 @@ static void handle_cmd_buf(CommandBuf buf)
 
 void ksh_term_start(Terminal term)
 {
-    handle_cmd_buf(term.cmd_buf);
+    handle_cmd_buf(term.commands);
     ksh_termio_init();
 
     while (true) {
@@ -45,7 +45,7 @@ void ksh_term_start(Terminal term)
 
         if (strncmp(line, "quit\n", 4) == 0) break;
         Lexer lex = ksh_lexer_new((StrView){ .items = line, .len = strlen(line) });
-        ksh_parse(&lex, (CallContext){0});
+        ksh_parse(&lex, &term);
     }
 
     ksh_termio_end();

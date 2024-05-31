@@ -80,28 +80,15 @@ typedef struct {
 
 typedef struct {
     Command *cmd;
-    Arg *argv;
-    size_t argc;
+    Arg     *argv;
+    size_t  argc;
+    size_t  last_assigned_arg_idx;
 } CommandCall;
-
-typedef enum {
-    COMMAND_CALL_STATE_DEF,
-    COMMAND_CALL_STATE_EXIT,
-    COMMAND_CALL_STATE_SYS,
-} CommandCallState;
 
 typedef struct {
     Command *items;
     size_t len;
 } CommandBuf;
-
-typedef struct {
-    CommandCall cmd_call;
-    CommandCallState state;
-    CommandBuf commands;
-    size_t last_assigned_arg;
-} CallContext;
-
 
 void ksh_cmd_print(Command cmd);
 Command *ksh_cmd_find_local(CommandBuf buf, StrView sv);
@@ -117,46 +104,6 @@ void ksh_arg_def_print(ArgDef cmd_arg);
 
 Arg *ksh_args_find(size_t argc, Arg argv[argc], StrView sv);
 
-///////////////////////////////////////////////
-/// LEXER
-//////////////////////////////////////////////
-
-typedef enum {
-    TOKEN_TYPE_LIT,
-    TOKEN_TYPE_STRING,
-    TOKEN_TYPE_NUMBER,
-    TOKEN_TYPE_BOOL,
-    TOKEN_TYPE_EQ,
-    TOKEN_TYPE_KEYWORD_SYS,
-    TOKEN_TYPE_INVALID,
-
-    TOKEN_TYPE_END,
-    TOKEN_TYPE_ENUM_END,
-    TOKEN_TYPE_PLUS
-} TokenType;
-
-typedef struct {
-    TokenType type;
-    StrView text;
-} Token;
-
-typedef struct {
-    StrView text;
-    size_t cursor;
-    Token buf;
-} Lexer;
-
-Lexer ksh_lexer_new(StrView sv);
-const char *ksh_lexer_token_type_to_string(TokenType token_type);
-bool ksh_lexer_peek_token(Lexer *l, Token *t);
-bool ksh_lexer_next_token(Lexer *l, Token *t);
-bool ksh_lexer_is_next_token(Lexer *l, TokenType tt);
-bool ksh_lexer_next_token_if(Lexer *l, TokenType tt, Token *t);
-KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
-
-ArgVal ksh_token_to_arg_val(Token tok);
-
-KshErr ksh_parse(Lexer *lex, CallContext context);
 
 ///////////////////////////////////////////////
 /// TERM
@@ -208,9 +155,16 @@ typedef struct {
     size_t parts_len;
 } Prompt;
 
+typedef enum {
+    TERMINAL_MOD_DEF,
+    TERMINAL_MOD_SYS,
+} TerminalMod;
+
 typedef struct {
-    CommandBuf cmd_buf;
-    Prompt prompt;
+    CommandBuf  commands;
+    Prompt      prompt;
+    TerminalMod mod;
+    CommandCall cur_cmd_call;
 } Terminal;
 
 void ksh_term_start(Terminal term);
@@ -221,5 +175,46 @@ void ksh_termio_init(void);
 void ksh_termio_print(TermTextPrefs prefs, const char *fmt, ...);
 void ksh_termio_getline(size_t size, char buf[size]);
 void ksh_termio_end(void);
+
+///////////////////////////////////////////////
+/// LEXER
+//////////////////////////////////////////////
+
+typedef enum {
+    TOKEN_TYPE_LIT,
+    TOKEN_TYPE_STRING,
+    TOKEN_TYPE_NUMBER,
+    TOKEN_TYPE_BOOL,
+    TOKEN_TYPE_EQ,
+    TOKEN_TYPE_KEYWORD_SYS,
+    TOKEN_TYPE_INVALID,
+
+    TOKEN_TYPE_END,
+    TOKEN_TYPE_ENUM_END,
+    TOKEN_TYPE_PLUS
+} TokenType;
+
+typedef struct {
+    TokenType type;
+    StrView text;
+} Token;
+
+typedef struct {
+    StrView text;
+    size_t cursor;
+    Token buf;
+} Lexer;
+
+Lexer ksh_lexer_new(StrView sv);
+const char *ksh_lexer_token_type_to_string(TokenType token_type);
+bool ksh_lexer_peek_token(Lexer *l, Token *t);
+bool ksh_lexer_next_token(Lexer *l, Token *t);
+bool ksh_lexer_is_next_token(Lexer *l, TokenType tt);
+bool ksh_lexer_next_token_if(Lexer *l, TokenType tt, Token *t);
+KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
+
+ArgVal ksh_token_to_arg_val(Token tok);
+
+KshErr ksh_parse(Lexer *lex, Terminal *term);
 
 #endif
