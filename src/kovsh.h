@@ -96,6 +96,7 @@ Command *ksh_cmd_find_hardcoded(StrView sv);
 Command *ksh_cmd_find(CommandBuf buf, StrView sv);
 CommandCall ksh_cmd_create_call(Command *cmd);
 ArgDef *ksh_cmd_find_arg_def(Command *cmd, StrView name);
+KshErr ksh_cmd_get(CommandBuf buf, StrView sv, Command *out);
 
 KshErr ksh_cmd_call_exec(CommandCall call);
 
@@ -165,9 +166,13 @@ typedef struct {
     Prompt      prompt;
     TerminalMod mod;
     CommandCall cur_cmd_call;
+    bool        should_exit;
 } Terminal;
 
-void ksh_term_start(Terminal term);
+void ksh_term_add_command(Command cmd);
+void ksh_term_set_prompt(Prompt p);
+void ksh_term_set_mod(TerminalMod mod);
+void ksh_term_run(void);
 
 void ksh_prompt_print(Prompt p);
 

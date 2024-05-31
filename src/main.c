@@ -20,22 +20,16 @@ int main(void)
     char login[10];
     getlogin_r(login, 10);
 
-    Terminal term = {
-        .prompt.parts_len = 2,
-        .prompt.parts = (PromptPart[]){
-            {
-                .text = login,
-                .text_prefs.mode.bold = true,
-                .text_prefs.fg_color = TERM_COLOR_GREEN
-            },
-            {
-                .text = "$ ",
-                .text_prefs.fg_color = TERM_COLOR_GREEN
+    ksh_term_set_prompt(
+        (Prompt){
+            .parts_len = 2,
+            .parts = (PromptPart[]){
+                { .text = login },
+                { .text = "$ " }
             }
         }
-    };
+    );
 
-    ksh_term_start(term);
-
+    ksh_term_run();
     return 0;
 }

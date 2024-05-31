@@ -1,7 +1,108 @@
 #include "kovsh.h"
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+// embedded commands
+static int ksh_clear(size_t argc, Arg argv[argc]);
+static int ksh_help(size_t argc, Arg argv[argc]);
+static int ksh_exit(size_t argc, Arg argv[argc]);
+static int ksh_setmod(size_t argc, Arg argv[argc]);
+static int ksh_echo(size_t argc, Arg argv[argc]);
+
+#define EMBEDDED_COMMANDS_COUNT 4
+
+#ifndef MAX_COMMANDS
+#  define MAX_COMMANDS 128
+#endif
+
+static int command_cursor = EMBEDDED_COMMANDS_COUNT;
+static Command commands[EMBEDDED_COMMANDS_COUNT + MAX_COMMANDS] = {
+    {
+        .name = STRV_LIT("clear"),
+        .desc = "Clear terminal",
+        .fn = ksh_clear
+    },
+    {
+        .name = STRV_LIT("exit"),
+        .desc = "Exit from the terminal",
+        .fn = ksh_exit
+    },
+    {
+        .name = STRV_LIT("help"),
+        .desc = "Do you want to know about the cmd?",
+        .fn = ksh_help,
+        .arg_defs_len = 1,
+        .arg_defs = (ArgDef[]){
+            {
+                .name = STRV_LIT("cmd"),
+                .usage = "Command",
+                .type = ARG_VAL_TYPE_STR
+            }
+        }
+    },
+    {
+        .name = STRV_LIT("setmod"),
+        .desc = "Set the terminal mod (sys,def)",
+        .fn = ksh_setmod,
+        .arg_defs_len = 1,
+        .arg_defs = (ArgDef[]){
+            {
+                .name = STRV_LIT("mod"),
+                .usage = "Mod to set",
+                .type = ARG_VAL_TYPE_STR
+            }
+        }
+    },
+    {
+        .name = STRV_LIT("echo"),
+        .desc = "Talks with you",
+        .fn = ksh_echo,
+        .arg_defs_len = 2,
+        .arg_defs = (ArgDef[]){
+            {
+                .name = STRV_LIT("msg"),
+                .usage = "Message to print",
+                .type = ARG_VAL_TYPE_STR,
+                .has_default = true,
+                .default_val.as_str = STRV_LIT("сухарики")
+            },
+            {
+                .name = STRV_LIT("rep"),
+                .usage = "Repeat count",
+                .type = ARG_VAL_TYPE_INT,
+                .has_default = true,
+                .default_val.as_int = 1,
+            }
+        }
+    }
+};
+
+static Terminal terminal = {
+    .commands.items = commands,
+    .commands.len = EMBEDDED_COMMANDS_COUNT + MAX_COMMANDS
+};
+
+void ksh_term_add_command(Command cmd)
+{
+    assert(command_cursor+1 < MAX_COMMANDS);
+    assert(cmd.name.items);
+
+    for (size_t i = 0; i < cmd.arg_defs_len; i++) {
+        assert(cmd.arg_defs[i].name.items);
+        if (!cmd.arg_defs[i].usage) {
+            cmd.arg_defs[i].usage = "None";
+        }
+    }
+
+    if (!cmd.desc) cmd.desc = "None";
+
+    commands[command_cursor++] = cmd;
+}
+
+void ksh_term_set_prompt(Prompt p) { terminal.prompt = p; }
+void ksh_term_set_mod(TerminalMod mod) { terminal.mod = mod; }
 
 void ksh_prompt_print(Prompt p)
 {
@@ -10,43 +111,79 @@ void ksh_prompt_print(Prompt p)
     }
 }
 
-static void handle_cmd_buf(CommandBuf buf)
-{
-    for (size_t i = 0; i < buf.len; i++) {
-        Command cmd = buf.items[i];
-
-        assert(cmd.name.items);
-        assert(cmd.fn);
-
-        for (size_t y = 0; y < cmd.arg_defs_len; y++) {
-            assert(cmd.arg_defs[y].name.items);
-            if (cmd.arg_defs[y].usage == 0) {
-                cmd.arg_defs[y].usage = "None";
-            }
-        }
-
-        if (cmd.desc == 0) {
-            buf.items[i].desc = "None";
-        }
-    }
-}
-
-void ksh_term_start(Terminal term)
-{
-    handle_cmd_buf(term.commands);
-    ksh_termio_init();
-
-    while (true) {
 #define MAX_LINE 100
-        char line[MAX_LINE];
+void ksh_term_run()
+{
+    ksh_termio_init();
+    while (!terminal.should_exit) {
+        ksh_prompt_print(terminal.prompt);
 
-        ksh_prompt_print(term.prompt);
+        char line[MAX_LINE];
         ksh_termio_getline(MAX_LINE, line);
 
-        if (strncmp(line, "quit\n", 4) == 0) break;
         Lexer lex = ksh_lexer_new((StrView){ .items = line, .len = strlen(line) });
-        ksh_parse(&lex, &term);
+        ksh_parse(&lex, &terminal);
     }
 
     ksh_termio_end();
+}
+
+// embedded commands
+#if TERMIO == TERMIO_DEFAULT
+static int
+ksh_clear(size_t argc, Arg argv[argc])
+{
+    (void) argc; (void) argv;
+    system("clear");
+    return 0;
+}
+#else
+static int clear(size_t argc, Arg argv[argc]) { (void) argc; (void) argv; }
+#endif
+
+static int
+ksh_help(size_t argc, Arg argv[argc])
+{
+    assert(argc == 1);
+
+    Command *cmd = ksh_cmd_find(terminal.commands, argv[0].value.as_str);
+    if (!cmd) {
+        ksh_termio_print((TermTextPrefs){0},
+                         STRV_FMT" doesn't exist\n",
+                         STRV_ARG(argv[0].value.as_str));
+        return 1;
+    }
+
+    ksh_cmd_print(*cmd);
+    return 0;
+}
+
+static int
+ksh_exit(size_t argc, Arg argv[argc])
+{
+    (void) argc; (void) argv;
+    assert(argc == 0);
+    terminal.should_exit = true;
+    return 0;
+}
+
+static int
+ksh_setmod(size_t argc, Arg argv[argc])
+{
+    assert(argc == 1);
+    if (!strv_eq(argv[0].value.as_str, (StrView)STRV_LIT("sys"))) return 1;
+    return 0;
+}
+
+static int
+ksh_echo(size_t argc, Arg argv[argc])
+{
+    assert(argc == 2);
+    for (int i = 0; i < argv[1].value.as_int; i++) {
+        ksh_termio_print((TermTextPrefs){0},
+                         STRV_FMT"\n",
+                         STRV_ARG(argv[0].value.as_str));
+    }
+
+    return 0;
 }
