@@ -38,12 +38,11 @@ typedef struct {
 } Variety;
 
 static const ParseDb keyword_db = {
-    .len = 3,
+    .len = 2,
     .item_size = sizeof(Keyword),
     .items = (uint8_t *)(Keyword[]){
         { .type = TOKEN_TYPE_BOOL, .word = STRV_LIT("true") },
         { .type = TOKEN_TYPE_BOOL, .word = STRV_LIT("false") },
-        { .type = TOKEN_TYPE_KEYWORD_SYS, .word = STRV_LIT("sys") }
     },
 };
 

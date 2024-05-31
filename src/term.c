@@ -112,7 +112,7 @@ void ksh_prompt_print(Prompt p)
 }
 
 #define MAX_LINE 100
-void ksh_term_run()
+void ksh_term_run(void)
 {
     ksh_termio_init();
     while (!terminal.should_exit) {
@@ -121,8 +121,21 @@ void ksh_term_run()
         char line[MAX_LINE];
         ksh_termio_getline(MAX_LINE, line);
 
-        Lexer lex = ksh_lexer_new((StrView){ .items = line, .len = strlen(line) });
-        ksh_parse(&lex, &terminal);
+        switch (terminal.mod) {
+            case TERMINAL_MOD_DEF:;
+                Lexer lex = ksh_lexer_new((StrView){ .items = line, .len = strlen(line) });
+                ksh_parse(&lex, &terminal);
+                break;
+            case TERMINAL_MOD_SYS:
+                if (strncmp(line, "@q", 2) == 0) {
+                    terminal.mod = TERMINAL_MOD_DEF;
+                } else {
+                    system(line);
+                }
+                break;
+            default: assert(0 && "unknown terminal mod");
+        }
+
     }
 
     ksh_termio_end();
@@ -172,6 +185,7 @@ ksh_setmod(size_t argc, Arg argv[argc])
 {
     assert(argc == 1);
     if (!strv_eq(argv[0].value.as_str, (StrView)STRV_LIT("sys"))) return 1;
+    terminal.mod = TERMINAL_MOD_SYS;
     return 0;
 }
 
