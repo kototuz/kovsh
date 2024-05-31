@@ -161,8 +161,11 @@ KshErr ksh_cmd_call_exec(CommandCall cmd_call)
         if (err != KSH_ERR_OK) return err;
     }
 
-    ksh_termio_print((TermTextPrefs){0}, "COMMAND RESULT: %d\n",
-                     cmd_call.cmd->fn(cmd_call.argc, cmd_call.argv));
+    int call_result = cmd_call.cmd->fn(cmd_call.argc, cmd_call.argv);
+    if (call_result) {
+        ksh_termio_print((TermTextPrefs){ .fg_color = TERM_COLOR_RED, .mode.bold = true },
+                         "command returned err: %d", call_result);
+    }
 
     free(cmd_call.argv);
     return KSH_ERR_OK;
@@ -188,7 +191,7 @@ static int echo_fn(size_t argc, Arg argv[argc])
 
     return 0;
 }
-#ifdef TERMIO_NCURSES
+#if TERMIO == TERMIO_NCURSES
 static int clear_fn(size_t argc, Arg argv[argc])
 {
     (void)argc;
@@ -196,7 +199,7 @@ static int clear_fn(size_t argc, Arg argv[argc])
     clear();
     return 0;
 }
-#elif defined(TERMIO_DEFAULT)
+#elif TERMIO == TERMIO_DEFAULT
 static int clear_fn(size_t argc, Arg argv[argc])
 {
     (void) argc; (void) argv;

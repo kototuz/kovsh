@@ -1,6 +1,6 @@
 #include "kovsh.h"
 
-#ifdef TERMIO_NCURSES
+#if TERMIO == TERMIO_NCURSES
 
 #include <ncurses.h>
 
@@ -69,7 +69,7 @@ void ksh_termio_end(void)
 {
     endwin();
 }
-#elif defined(TERMIO_DEFAULT)
+#elif TERMIO == TERMIO_DEFAULT
 
 void ksh_termio_init(void) {}
 void ksh_termio_end(void) {}

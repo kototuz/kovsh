@@ -183,8 +183,10 @@ KshErr ksh_parse(Lexer *lex, CallContext context);
 /// TERM
 //////////////////////////////////////////////
 
+#define TERMIO_NCURSES 0
+#define TERMIO_DEFAULT 1
 #ifndef TERMIO
-#  define TERMIO_DEFAULT
+#  define TERMIO TERMIO_DEFAULT
 #endif
 
 #define TERM_COLOR_COUNT (TERM_COLOR_END-1)

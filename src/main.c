@@ -1,8 +1,11 @@
+#define  TERMIO TERMIO_NCURSES
 #include "kovsh.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
+
 
 int echo_fn(size_t argc, Arg argv[argc])
 {

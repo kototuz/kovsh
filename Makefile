@@ -1,5 +1,7 @@
 cc := gcc
-cflags := -Wall -Wextra -pedantic -g
+
+export termio=TERMIO_DEFAULT
+cflags := -Wall -Wextra -pedantic -g -DTERMIO=$(termio)
 
 main:=src/main.c
 
@@ -11,6 +13,7 @@ sources:=$(subst $(main),,$(sources))
 
 objects:=$(subst src,$(obj_dir),$(sources))
 objects:=$(objects:.c=.o)
+
 
 .PHONY: dirs run
 
