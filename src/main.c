@@ -1,4 +1,3 @@
-#define  TERMIO TERMIO_NCURSES
 #include "kovsh.h"
 
 #include <stdio.h>

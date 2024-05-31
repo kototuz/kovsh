@@ -121,7 +121,6 @@ Arg *ksh_args_find(size_t argc, Arg argv[argc], StrView sv);
 /// LEXER
 //////////////////////////////////////////////
 
-
 typedef enum {
     TOKEN_TYPE_LIT,
     TOKEN_TYPE_STRING,
@@ -146,26 +145,6 @@ typedef struct {
     size_t cursor;
     Token buf;
 } Lexer;
-
-typedef struct {
-    TokenType *seq;
-    size_t seq_len;
-    KshErr (*eval_fn)(Token *toks, CommandCall *cmd_call);
-} TokenPattern;
-
-typedef struct {
-    Token *items;
-    size_t len;
-} TokenSeq;
-
-typedef struct {
-    CommandBuf cmds;
-} ParseInfo;
-
-typedef struct {
-    ParseInfo info;
-    Lexer lex;
-} Parser;
 
 Lexer ksh_lexer_new(StrView sv);
 const char *ksh_lexer_token_type_to_string(TokenType token_type);
