@@ -149,11 +149,13 @@ typedef struct {
 typedef struct {
     const char *text;
     TermTextPrefs text_prefs;
+    bool overrides_global;
 } PromptPart;
 
 typedef struct {
-    PromptPart *parts;
-    size_t parts_len;
+    PromptPart   *parts;
+    size_t        parts_len;
+    TermTextPrefs global_prefs;
 } Prompt;
 
 typedef enum {

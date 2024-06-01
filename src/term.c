@@ -109,7 +109,13 @@ void ksh_term_set_mod(TerminalMod mod) { terminal.mod = mod; }
 void ksh_prompt_print(Prompt p)
 {
     for (size_t i = 0; i < p.parts_len; i++) {
-        ksh_termio_print(p.parts[i].text_prefs, p.parts[i].text);
+        PromptPart part = p.parts[i];
+        TermTextPrefs prefs = p.global_prefs;
+        if (part.overrides_global) {
+            prefs = part.text_prefs;
+        }
+
+        ksh_termio_print(prefs, part.text);
     }
 }
 

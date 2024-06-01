@@ -20,15 +20,14 @@ int main(void)
     char login[10];
     getlogin_r(login, 10);
 
-    ksh_term_set_prompt(
-        (Prompt){
-            .parts_len = 2,
-            .parts = (PromptPart[]){
-                { .text = login },
-                { .text = "$ " }
-            }
-        }
-    );
+    ksh_term_set_prompt((Prompt){
+        .parts_len = 2,
+        .parts = (PromptPart[]){
+            { .text = login },
+            { .text = "$ " }
+        },
+        .global_prefs.fg_color = TERM_COLOR_BLUE
+    });
 
     ksh_term_run();
     return 0;
