@@ -29,11 +29,19 @@ Arg *cmd_call_find_arg(CommandCall cmd_call, StrView arg_name)
     return NULL;
 }
 
+static const TermTextPrefs info_text_prefs = { .fg_color = TERM_COLOR_YELLOW };
 void ksh_cmd_print(Command cmd)
 {
-    printf("[COMMAND]:\t"STRV_FMT"\n", STRV_ARG(cmd.name));
-    printf("[DESCRIPTION]:\t%s\n", cmd.desc);
-    puts("[ARGS]:");
+    ksh_termio_print(info_text_prefs,
+                     "[COMMAND]:\t"STRV_FMT"\n",
+                     STRV_ARG(cmd.name));
+    ksh_termio_print(info_text_prefs,
+                     "[DESCRIPTION]:\t%s\n",
+                     cmd.desc);
+
+    if (cmd.arg_defs_len < 1) return;
+
+    ksh_termio_print(info_text_prefs, "[ARGS]:%s\n", "");
     for (size_t i = 0; i < cmd.arg_defs_len; i++) {
         ksh_arg_def_print(cmd.arg_defs[i]);
     }
@@ -65,10 +73,11 @@ ArgDef *ksh_cmd_find_arg_def(Command *cmd, StrView sv)
 
 void ksh_arg_def_print(ArgDef arg)
 {
-    printf("\t"STRV_FMT"=<%s>\t%s\n",
-           STRV_ARG(arg.name),
-           ksh_arg_val_type_to_str(arg.type),
-           arg.usage);
+    ksh_termio_print(info_text_prefs,
+                     "\t"STRV_FMT"=<%s>\t%s\n",
+                     STRV_ARG(arg.name),
+                     ksh_arg_val_type_to_str(arg.type),
+                     arg.usage);
 }
 
 const char *ksh_arg_val_type_to_str(ArgValType cavt)
