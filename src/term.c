@@ -158,8 +158,14 @@ ksh_clear(size_t argc, Arg argv[argc])
     system("clear");
     return 0;
 }
-#else
-static int clear(size_t argc, Arg argv[argc]) { (void) argc; (void) argv; }
+#elif TERMIO == TERMIO_NCURSES
+#include <ncurses.h>
+static int ksh_clear(size_t argc, Arg argv[argc])
+{
+    (void) argc; (void) argv;
+    clear();
+    return 0;
+}
 #endif
 
 static int

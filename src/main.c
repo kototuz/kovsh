@@ -24,7 +24,11 @@ int main(void)
         .parts_len = 2,
         .parts = (PromptPart[]){
             { .text = login },
-            { .text = "$ " }
+            {
+                .text = "> ",
+                .overrides_global = true,
+                .text_prefs.fg_color = TERM_COLOR_YELLOW,
+            }
         },
         .global_prefs.fg_color = TERM_COLOR_BLUE
     });
