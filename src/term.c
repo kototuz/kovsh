@@ -11,14 +11,16 @@ static int ksh_exit(size_t argc, Arg argv[argc]);
 static int ksh_setmod(size_t argc, Arg argv[argc]);
 static int ksh_echo(size_t argc, Arg argv[argc]);
 
-#define EMBEDDED_COMMANDS_COUNT 4
+#define BUILTIN_COMMANDS_COUNT 4
 
-#ifndef MAX_COMMANDS
-#  define MAX_COMMANDS 128
+#ifndef USER_COMMANDS_COUNT
+#  define USER_COMMANDS_COUNT 128
 #endif
 
-static int command_cursor = EMBEDDED_COMMANDS_COUNT;
-static Command commands[EMBEDDED_COMMANDS_COUNT + MAX_COMMANDS] = {
+#define COMMANDS_COUNT BUILTIN_COMMANDS_COUNT + USER_COMMANDS_COUNT
+
+static int command_cursor = BUILTIN_COMMANDS_COUNT;
+static Command commands[COMMANDS_COUNT] = {
     {
         .name = STRV_LIT("clear"),
         .desc = "Clear terminal",
@@ -81,12 +83,12 @@ static Command commands[EMBEDDED_COMMANDS_COUNT + MAX_COMMANDS] = {
 
 static Terminal terminal = {
     .commands.items = commands,
-    .commands.len = EMBEDDED_COMMANDS_COUNT + MAX_COMMANDS
+    .commands.len = COMMANDS_COUNT
 };
 
 void ksh_term_add_command(Command cmd)
 {
-    assert(command_cursor+1 < MAX_COMMANDS);
+    assert(command_cursor+1 < COMMANDS_COUNT);
     assert(cmd.name.items);
 
     for (size_t i = 0; i < cmd.arg_defs_len; i++) {
