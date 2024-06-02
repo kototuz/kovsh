@@ -76,18 +76,8 @@ void ksh_arg_def_print(ArgDef arg)
     ksh_termio_print(info_text_prefs,
                      "\t"STRV_FMT"=<%s>\t%s\n",
                      STRV_ARG(arg.name),
-                     ksh_arg_val_type_to_str(arg.type),
+                     ksh_val_type_str(arg.type),
                      arg.usage);
-}
-
-const char *ksh_arg_val_type_to_str(ArgValType cavt)
-{
-    switch (cavt) {
-    case ARG_VAL_TYPE_STR: return "string";
-    case ARG_VAL_TYPE_INT: return "integer";
-    case ARG_VAL_TYPE_BOOL: return "bool";
-    default: return "unknown";
-    }
 }
 
 CommandCall ksh_cmd_create_call(Command *cmd)

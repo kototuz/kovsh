@@ -8,11 +8,17 @@
 #include <assert.h>
 #include <stdarg.h>
 
+///////////////////////////////////////////////
+/// COMMON
+//////////////////////////////////////////////
+
 #define KSH_LOG_ERR(msg, ...) \
   (ksh_termio_print((TermTextPrefs){.fg_color = TERM_COLOR_RED, .mode.bold = true}, "[KOVSH ERR]: "msg"\n", __VA_ARGS__))
 
-// UTILS
-// ERRORS
+#define STRV_LIT(lit) { sizeof(lit)-1, (lit) }
+#define STRV_FMT "%.*s"
+#define STRV_ARG(sv) (int) (sv).len, (sv).items
+
 typedef enum {
     KSH_ERR_OK = 0,
     KSH_ERR_COMMAND_NOT_FOUND,
@@ -24,48 +30,46 @@ typedef enum {
     KSH_ERR_PATTERN_NOT_FOUND
 } KshErr;
 
-const char *ksh_err_str(KshErr err);
-
 typedef struct {
     size_t len;
     const char *items;
 } StrView;
-#define STRV_LIT(lit) { sizeof(lit)-1, (lit) }
 
-#define STRV_FMT "%.*s"
-#define STRV_ARG(sv) (int) (sv).len, (sv).items
+typedef enum {
+    KSH_VALUE_TYPE_STR,
+    KSH_VALUE_TYPE_INT,
+    KSH_VALUE_TYPE_BOOL,
+} KshValueType;
+
+typedef union {
+    StrView as_str;
+    int     as_int;
+    bool    as_bool;
+} KshValue;
+
+const char *ksh_err_str(KshErr err);
 
 StrView strv_new(const char *data, size_t data_len);
-bool strv_eq(StrView sv1, StrView sv2);
+bool    strv_eq(StrView sv1, StrView sv2);
+
+const char *ksh_val_type_str(KshValueType t);
 
 ///////////////////////////////////////////////
 /// COMMAND
 //////////////////////////////////////////////
 
-typedef enum {
-    ARG_VAL_TYPE_STR,
-    ARG_VAL_TYPE_INT,
-    ARG_VAL_TYPE_BOOL,
-} ArgValType;
-
-typedef union {
-    StrView as_str;
-    int as_int;
-    bool as_bool;
-} ArgVal; 
-
 typedef struct {
     StrView name;
+    KshValueType type;
+    KshValue default_val;
     const char *usage;
     bool has_default;
-    ArgValType type;
-    ArgVal default_val;
 } ArgDef;
 
 typedef struct {
     ArgDef *def;
+    KshValue value;
     bool is_assign;
-    ArgVal value;
 } Arg;
 
 typedef int (*CommandFn)(size_t argc, Arg argv[argc]);
@@ -100,7 +104,6 @@ KshErr ksh_cmd_get(CommandBuf buf, StrView sv, Command *out);
 
 KshErr ksh_cmd_call_exec(CommandCall call);
 
-const char *ksh_arg_val_type_to_str(ArgValType avt);
 void ksh_arg_def_print(ArgDef cmd_arg);
 
 Arg *ksh_args_find(size_t argc, Arg argv[argc], StrView sv);
@@ -220,7 +223,7 @@ bool ksh_lexer_is_next_token(Lexer *l, TokenType tt);
 bool ksh_lexer_next_token_if(Lexer *l, TokenType tt, Token *t);
 KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
 
-ArgVal ksh_token_to_arg_val(Token tok);
+KshValue ksh_token_to_value(Token tok);
 
 KshErr ksh_parse(Lexer *lex, Terminal *term);
 

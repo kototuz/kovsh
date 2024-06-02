@@ -14,7 +14,7 @@ static void lexer_trim(Lexer *l);
 static bool is_lit(int letter);
 static bool is_dig(int s) { return isdigit(s); }
 
-static bool token_type_expect_arg_val_type(TokenType tt, ArgValType avt);
+static bool cmp_tok_type_with_val_type(TokenType tt, KshValueType kvt);
 
 typedef struct {
     size_t len;
@@ -187,9 +187,9 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
     return KSH_ERR_OK;
 }
 
-ArgVal ksh_token_to_arg_val(Token tok)
+KshValue ksh_token_to_value(Token tok)
 {
-    ArgVal result = {0};
+    KshValue result;
     switch (tok.type) {
     case TOKEN_TYPE_STRING:
         result.as_str = strv_new(&tok.text.items[1], tok.text.len-2);
@@ -360,18 +360,18 @@ static bool is_lit(int letter)
            || ('0' <= letter && letter <= '9');
 }
 
-static bool token_type_expect_arg_val_type(TokenType tt, ArgValType avt)
+static bool cmp_tok_type_with_val_type(TokenType tt, KshValueType kvt)
 {
     switch (tt) {
     case TOKEN_TYPE_STRING:
     case TOKEN_TYPE_LIT:
-        if (avt != ARG_VAL_TYPE_STR) return false;
+        if (kvt != KSH_VALUE_TYPE_STR) return false;
         break;
     case TOKEN_TYPE_NUMBER:
-        if (avt != ARG_VAL_TYPE_INT) return false;
+        if (kvt != KSH_VALUE_TYPE_INT) return false;
         break;
     case TOKEN_TYPE_BOOL:
-        if (avt != ARG_VAL_TYPE_INT) return false;
+        if (kvt != KSH_VALUE_TYPE_BOOL) return false;
         break;
     default: return false;
     }
@@ -434,14 +434,14 @@ static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit)
             return KSH_ERR_ARG_NOT_FOUND;
         }
 
-        if (!token_type_expect_arg_val_type(arg_val.type, arg->def->type)) {
+        if (!cmp_tok_type_with_val_type(arg_val.type, arg->def->type)) {
             KSH_LOG_ERR("arg `"STRV_FMT"`: expected type: `%s`",
                         STRV_ARG(arg->def->name),
-                        ksh_arg_val_type_to_str(arg->def->type));
+                        ksh_val_type_str(arg->def->type));
             return KSH_ERR_TYPE_EXPECTED;
         }
 
-        arg->value = ksh_token_to_arg_val(arg_val);
+        arg->value = ksh_token_to_value(arg_val);
         arg->is_assign = true;
     }
 

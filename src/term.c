@@ -40,7 +40,7 @@ static Command commands[COMMANDS_COUNT] = {
             {
                 .name = STRV_LIT("cmd"),
                 .usage = "Command",
-                .type = ARG_VAL_TYPE_STR
+                .type = KSH_VALUE_TYPE_STR
             }
         }
     },
@@ -53,7 +53,7 @@ static Command commands[COMMANDS_COUNT] = {
             {
                 .name = STRV_LIT("mod"),
                 .usage = "Mod to set",
-                .type = ARG_VAL_TYPE_STR
+                .type = KSH_VALUE_TYPE_STR
             }
         }
     },
@@ -66,14 +66,14 @@ static Command commands[COMMANDS_COUNT] = {
             {
                 .name = STRV_LIT("msg"),
                 .usage = "Message to print",
-                .type = ARG_VAL_TYPE_STR,
+                .type = KSH_VALUE_TYPE_STR,
                 .has_default = true,
                 .default_val.as_str = STRV_LIT("сухарики")
             },
             {
                 .name = STRV_LIT("rep"),
                 .usage = "Repeat count",
-                .type = ARG_VAL_TYPE_INT,
+                .type = KSH_VALUE_TYPE_INT,
                 .has_default = true,
                 .default_val.as_int = 1,
             }
