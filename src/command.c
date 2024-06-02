@@ -109,7 +109,18 @@ KshErr ksh_cmd_call_exec(CommandCall cmd_call)
         if (err != KSH_ERR_OK) return err;
     }
 
-    int call_result = cmd_call.cmd->fn(cmd_call.argc, cmd_call.argv);
+    KshValue *args = (KshValue *) malloc(sizeof(*args) * cmd_call.argc);
+    if (!args) {
+        KSH_LOG_ERR("could not allocate memory%s", "");
+        return KSH_ERR_MEM_OVER;
+    }
+
+    for (size_t i = 0; i < cmd_call.argc; i++) {
+        args[i] = cmd_call.argv[i].value;
+    }
+
+    int call_result = cmd_call.cmd->fn(args);
+    free(args);
     if (call_result) {
         ksh_termio_print((TermTextPrefs){ .fg_color = TERM_COLOR_RED, .mode.bold = true },
                          "the command returned err: %d\n", call_result);

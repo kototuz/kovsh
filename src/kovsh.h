@@ -72,7 +72,7 @@ typedef struct {
     bool is_assign;
 } Arg;
 
-typedef int (*CommandFn)(size_t argc, Arg argv[argc]);
+typedef int (*CommandFn)(KshValue *args);
 
 typedef struct {
     StrView name;

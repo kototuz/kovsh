@@ -5,11 +5,11 @@
 #include <string.h>
 
 // embedded commands
-static int ksh_clear(size_t argc, Arg argv[argc]);
-static int ksh_help(size_t argc, Arg argv[argc]);
-static int ksh_exit(size_t argc, Arg argv[argc]);
-static int ksh_setmod(size_t argc, Arg argv[argc]);
-static int ksh_echo(size_t argc, Arg argv[argc]);
+static int ksh_clear(KshValue *args);
+static int ksh_help(KshValue *args);
+static int ksh_exit(KshValue *args);
+static int ksh_setmod(KshValue *args);
+static int ksh_echo(KshValue *args);
 
 #define BUILTIN_COMMANDS_COUNT 4
 
@@ -152,32 +152,30 @@ void ksh_term_run(void)
 // embedded commands
 #if TERMIO == TERMIO_DEFAULT
 static int
-ksh_clear(size_t argc, Arg argv[argc])
+ksh_clear(KshValue *args)
 {
-    (void) argc; (void) argv;
+    (void) args;
     system("clear");
     return 0;
 }
 #elif TERMIO == TERMIO_NCURSES
 #include <ncurses.h>
-static int ksh_clear(size_t argc, Arg argv[argc])
+static int ksh_clear(KshValue *args)
 {
-    (void) argc; (void) argv;
+    (void) args;
     clear();
     return 0;
 }
 #endif
 
 static int
-ksh_help(size_t argc, Arg argv[argc])
+ksh_help(KshValue *args)
 {
-    assert(argc == 1);
-
-    Command *cmd = ksh_cmd_find(terminal.commands, argv[0].value.as_str);
+    Command *cmd = ksh_cmd_find(terminal.commands, args[0].as_str);
     if (!cmd) {
         ksh_termio_print((TermTextPrefs){0},
                          STRV_FMT" doesn't exist\n",
-                         STRV_ARG(argv[0].value.as_str));
+                         STRV_ARG(args[0].as_str));
         return 1;
     }
 
@@ -186,31 +184,28 @@ ksh_help(size_t argc, Arg argv[argc])
 }
 
 static int
-ksh_exit(size_t argc, Arg argv[argc])
+ksh_exit(KshValue *args)
 {
-    (void) argc; (void) argv;
-    assert(argc == 0);
+    (void) args;
     terminal.should_exit = true;
     return 0;
 }
 
 static int
-ksh_setmod(size_t argc, Arg argv[argc])
+ksh_setmod(KshValue *args)
 {
-    assert(argc == 1);
-    if (!strv_eq(argv[0].value.as_str, (StrView)STRV_LIT("sys"))) return 1;
+    if (!strv_eq(args[0].as_str, (StrView)STRV_LIT("sys"))) return 1;
     terminal.mod = TERMINAL_MOD_SYS;
     return 0;
 }
 
 static int
-ksh_echo(size_t argc, Arg argv[argc])
+ksh_echo(KshValue *args)
 {
-    assert(argc == 2);
-    for (int i = 0; i < argv[1].value.as_int; i++) {
+    for (int i = 0; i < args[1].as_int; i++) {
         ksh_termio_print((TermTextPrefs){0},
                          STRV_FMT"\n",
-                         STRV_ARG(argv[0].value.as_str));
+                         STRV_ARG(args[0].as_str));
     }
 
     return 0;
