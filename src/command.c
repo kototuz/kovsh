@@ -43,7 +43,11 @@ void ksh_cmd_print(Command cmd)
 
     ksh_termio_print(info_text_prefs, "[ARGS]:%s\n", "");
     for (size_t i = 0; i < cmd.arg_defs_len; i++) {
-        ksh_arg_def_print(cmd.arg_defs[i]);
+        ksh_termio_print(info_text_prefs,
+                         "\t"STRV_FMT"=<%s>\t%s\n",
+                         STRV_ARG(cmd.arg_defs[i].name),
+                         ksh_val_type_str(cmd.arg_defs[i].type),
+                         cmd.arg_defs[i].usage);
     }
 }
 
@@ -69,15 +73,6 @@ ArgDef *ksh_cmd_find_arg_def(Command *cmd, StrView sv)
     }
 
     return NULL;
-}
-
-void ksh_arg_def_print(ArgDef arg)
-{
-    ksh_termio_print(info_text_prefs,
-                     "\t"STRV_FMT"=<%s>\t%s\n",
-                     STRV_ARG(arg.name),
-                     ksh_val_type_str(arg.type),
-                     arg.usage);
 }
 
 CommandCall ksh_cmd_create_call(Command *cmd)
