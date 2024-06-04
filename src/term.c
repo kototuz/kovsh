@@ -4,6 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define BUILTIN_VARIABLES_LEN (sizeof(variables)/sizeof(variables[0]))
+
+#define BUILTIN_COMMANDS_COUNT 4
+#ifndef USER_COMMANDS_COUNT
+#  define USER_COMMANDS_COUNT 128
+#endif
+#define COMMANDS_COUNT BUILTIN_COMMANDS_COUNT + USER_COMMANDS_COUNT
+
+#define MAX_LINE 100
+
 // embedded commands
 static int ksh_clear(KshValue *args);
 static int ksh_help(KshValue *args);
@@ -11,13 +21,6 @@ static int ksh_exit(KshValue *args);
 static int ksh_setmod(KshValue *args);
 static int ksh_echo(KshValue *args);
 
-#define BUILTIN_COMMANDS_COUNT 4
-
-#ifndef USER_COMMANDS_COUNT
-#  define USER_COMMANDS_COUNT 128
-#endif
-
-#define COMMANDS_COUNT BUILTIN_COMMANDS_COUNT + USER_COMMANDS_COUNT
 
 static int command_cursor = BUILTIN_COMMANDS_COUNT;
 static Command commands[COMMANDS_COUNT] = {
@@ -119,7 +122,6 @@ void ksh_prompt_print(Prompt p)
     }
 }
 
-#define MAX_LINE 100
 void ksh_term_run(void)
 {
     ksh_termio_init();
