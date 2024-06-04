@@ -50,6 +50,7 @@ typedef union {
 
 const char *ksh_err_str(KshErr err);
 
+StrView strv_from_str(const char *str);
 StrView strv_new(const char *data, size_t data_len);
 bool    strv_eq(StrView sv1, StrView sv2);
 
