@@ -135,29 +135,12 @@ bool ksh_lexer_peek_token(Lexer *l, Token *t)
     lexer_trim(l);
     if (l->text.items[l->cursor] == '\0') return false;
 
-    Token tok;
     StrView text = { .items = &l->text.items[l->cursor], .len = l->text.len - l->cursor };
-    for (size_t i = 0; i < STATIC_ARR_LEN(token_parsers); i++) {
-        struct TokenParser tp = token_parsers[i];
+    KshErr err = ksh_token_from_strv(text, t);
+    if (err != KSH_ERR_OK) return false;
+    l->buf = *t;
 
-        if (tp.db.len == 0) {
-            if (tp.parse_fn(text, NULL, &tok)) {
-                l->buf = tok;
-                *t = tok;
-                return true;
-            }
-        }
-
-        for (size_t i = 0; i < tp.db.len; i++) {
-            if (tp.parse_fn(text, &tp.db.items[i*tp.db.item_size], &tok)) {
-                l->buf = tok;
-                *t = tok;
-                return true;
-            }
-        }
-    }
-
-    return false;
+    return true;
 }
 
 Lexer ksh_lexer_new(StrView ss)
@@ -217,6 +200,31 @@ KshErr ksh_token_init_value(Token tok, KshValueType type, KshValue *dest)
         }
 
     return token_converters[tok.type](tok, dest);
+}
+
+KshErr ksh_token_from_strv(StrView sv, Token *dest)
+{
+    for (size_t i = 0; i < STATIC_ARR_LEN(token_parsers); i++) {
+        struct TokenParser tp = token_parsers[i];
+
+        if (tp.db.len == 0)
+            if (tp.parse_fn(sv, NULL, dest))
+                return KSH_ERR_OK;
+
+        for (size_t i = 0; i < tp.db.len; i++)
+            if (tp.parse_fn(sv, &tp.db.items[i*tp.db.item_size], dest))
+                return KSH_ERR_OK;
+    }
+
+    return KSH_ERR_PATTERN_NOT_FOUND;
+}
+
+KshErr ksh_token_type_to_value(TokenType t, KshValueType *dest)
+{
+    if (t >= STATIC_ARR_LEN(tok_to_val_type_map))
+        return KSH_ERR_TYPE_EXPECTED;
+    *dest = tok_to_val_type_map[t];
+    return KSH_ERR_OK;
 }
 
 KshErr ksh_parse(Lexer *lex, Terminal *term)
