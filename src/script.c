@@ -233,6 +233,9 @@ KshErr ksh_token_init_value(Token tok, KshValueType type, KshValue *dest)
             if (tok.type != TOKEN_TYPE_BOOL) break;
             dest->as_bool = tok.text.items[0] == 't' ? 1 : 0;
             return KSH_ERR_OK;
+        case KSH_VALUE_TYPE_ANY:
+            dest->as_str = tok.text;
+            return KSH_ERR_OK;
     }
 
     return KSH_ERR_TYPE_EXPECTED;

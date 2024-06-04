@@ -39,6 +39,7 @@ typedef enum {
     KSH_VALUE_TYPE_STR,
     KSH_VALUE_TYPE_INT,
     KSH_VALUE_TYPE_BOOL,
+    KSH_VALUE_TYPE_ANY
 } KshValueType;
 
 typedef union {
