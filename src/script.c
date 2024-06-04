@@ -212,6 +212,32 @@ KshValue ksh_token_to_value(Token tok)
     return result;
 }
 
+KshErr ksh_token_init_value(Token tok, KshValueType type, KshValue *dest)
+{
+    switch (type) {
+        case KSH_VALUE_TYPE_STR:
+            if (tok.type == TOKEN_TYPE_LIT)
+                dest->as_str = tok.text;
+            else if (tok.type == TOKEN_TYPE_STRING)
+                dest->as_str = strv_new(&tok.text.items[1], tok.text.len-2);
+            else break;
+            return KSH_ERR_OK;
+        case KSH_VALUE_TYPE_INT:
+            if (tok.type != TOKEN_TYPE_NUMBER) break;
+            char *num_txt = (char *) malloc(tok.text.len);
+            memcpy(num_txt, tok.text.items, tok.text.len);
+            dest->as_int = atoi(num_txt);
+            free(num_txt);
+            return KSH_ERR_OK;
+        case KSH_VALUE_TYPE_BOOL:
+            if (tok.type != TOKEN_TYPE_BOOL) break;
+            dest->as_bool = tok.text.items[0] == 't' ? 1 : 0;
+            return KSH_ERR_OK;
+    }
+
+    return KSH_ERR_TYPE_EXPECTED;
+}
+
 KshErr ksh_parse(Lexer *lex, Terminal *term)
 {
     KshErr err;
@@ -434,14 +460,8 @@ static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit)
             return KSH_ERR_ARG_NOT_FOUND;
         }
 
-        if (!cmp_tok_type_with_val_type(arg_val.type, arg->def->type)) {
-            KSH_LOG_ERR("arg `"STRV_FMT"`: expected type: `%s`",
-                        STRV_ARG(arg->def->name),
-                        ksh_val_type_str(arg->def->type));
-            return KSH_ERR_TYPE_EXPECTED;
-        }
-
-        arg->value = ksh_token_to_value(arg_val);
+        KshErr err = ksh_token_init_value(arg_val, arg->def->type, &arg->value);
+        if (err != KSH_ERR_OK) return err;
         arg->is_assign = true;
     }
 
