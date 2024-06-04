@@ -187,31 +187,6 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
     return KSH_ERR_OK;
 }
 
-KshValue ksh_token_to_value(Token tok)
-{
-    KshValue result;
-    switch (tok.type) {
-    case TOKEN_TYPE_STRING:
-        result.as_str = strv_new(&tok.text.items[1], tok.text.len-2);
-        break;
-    case TOKEN_TYPE_LIT:
-        result.as_str = tok.text;
-        break;
-    case TOKEN_TYPE_NUMBER:;
-        char *buf = malloc(tok.text.len);
-        memcpy(buf, tok.text.items, tok.text.len);
-        result.as_int = atoi(buf);
-        free(buf);
-        break;
-    case TOKEN_TYPE_BOOL:
-        result.as_bool = tok.text.items[0] == 't' ? true : false;
-        break;
-    default: assert(0 && "not yet implemented");
-    }
-
-    return result;
-}
-
 KshErr ksh_token_init_value(Token tok, KshValueType type, KshValue *dest)
 {
     switch (type) {
