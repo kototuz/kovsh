@@ -14,8 +14,6 @@ static void lexer_trim(Lexer *l);
 static bool is_lit(int letter);
 static bool is_dig(int s) { return isdigit(s); }
 
-static bool cmp_tok_type_with_val_type(TokenType tt, KshValueType kvt);
-
 typedef struct {
     size_t len;
     size_t item_size;
@@ -365,25 +363,6 @@ static bool is_lit(int letter)
     return ('a' <= letter && letter <= 'z')
            || ('A' <= letter && letter <= 'Z')
            || ('0' <= letter && letter <= '9');
-}
-
-static bool cmp_tok_type_with_val_type(TokenType tt, KshValueType kvt)
-{
-    switch (tt) {
-    case TOKEN_TYPE_STRING:
-    case TOKEN_TYPE_LIT:
-        if (kvt != KSH_VALUE_TYPE_STR) return false;
-        break;
-    case TOKEN_TYPE_NUMBER:
-        if (kvt != KSH_VALUE_TYPE_INT) return false;
-        break;
-    case TOKEN_TYPE_BOOL:
-        if (kvt != KSH_VALUE_TYPE_BOOL) return false;
-        break;
-    default: return false;
-    }
-
-    return true;
 }
 
 static KshErr cmd_eval_fn(Lexer *l, Terminal *term, bool *exit)
