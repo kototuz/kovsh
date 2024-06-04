@@ -8,12 +8,6 @@
 
 #define STATIC_ARR_LEN(arr) (sizeof(arr) / sizeof(arr[0]))
 
-// PRIVATE FUNCTION DECLARATIONS
-static void lexer_inc(Lexer *l, size_t count);
-static void lexer_trim(Lexer *l);
-static bool is_lit(int letter);
-static bool is_dig(int s) { return isdigit(s); }
-
 typedef struct {
     size_t len;
     size_t item_size;
@@ -34,6 +28,32 @@ typedef struct {
     TokenType type;
     bool (*check_fn)(int s);
 } Variety;
+
+typedef bool (*ParseFn)(StrView sv, void *ctx, Token *out);
+typedef KshErr (*CmdCallWorkflowFn)(Lexer *l, Terminal *term, bool *exit);
+typedef KshErr (*TokenConvertFn)(Token tok, KshValue *dest);
+
+
+
+static void lexer_inc(Lexer *l, size_t count);
+static void lexer_trim(Lexer *l);
+static bool is_lit(int letter);
+static bool is_dig(int s) { return isdigit(s); }
+
+static bool parse_string_token(StrView sv, void *ctx, Token *out);
+static bool parse_variety_token(StrView sv, Variety *ctx, Token *out);
+static bool parse_keyword_token(StrView sv, Keyword *ctx, Token *out);
+static bool parse_spec_sym_token(StrView sv, SpecialSymbol *ctx, Token *out);
+
+static KshErr cmd_eval_fn(Lexer *lex, Terminal *term, bool *exit);
+static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit);
+
+static KshErr lit_token_convert(Token, KshValue*);
+static KshErr string_token_convert(Token, KshValue*);
+static KshErr number_token_convert(Token, KshValue*);
+static KshErr bool_token_convert(Token, KshValue*);
+
+
 
 static const ParseDb keyword_db = {
     .len = 2,
@@ -62,13 +82,6 @@ static const ParseDb variety_db = {
     }
 };
 
-static bool parse_string_token(StrView sv, void *ctx, Token *out);
-static bool parse_variety_token(StrView sv, Variety *ctx, Token *out);
-static bool parse_keyword_token(StrView sv, Keyword *ctx, Token *out);
-static bool parse_spec_sym_token(StrView sv, SpecialSymbol *ctx, Token *out);
-
-typedef bool (*ParseFn)(StrView sv, void *ctx, Token *out);
-
 static const struct TokenParser {
     const ParseDb db;
     ParseFn parse_fn;
@@ -79,22 +92,10 @@ static const struct TokenParser {
     { .parse_fn = (ParseFn) parse_string_token }
 };
 
-static KshErr cmd_eval_fn(Lexer *lex, Terminal *term, bool *exit);
-static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit);
-
-typedef KshErr (*CmdCallWorkflowFn)(Lexer *l, Terminal *term, bool *exit);
-
 static const CmdCallWorkflowFn cmd_call_workflow[] = {
     cmd_eval_fn,
     args_eval_fn,
 };
-
-typedef KshErr (*TokenConvertFn)(Token tok, KshValue *dest);
-
-static KshErr lit_token_convert(Token, KshValue*);
-static KshErr string_token_convert(Token, KshValue*);
-static KshErr number_token_convert(Token, KshValue*);
-static KshErr bool_token_convert(Token, KshValue*);
 
 static const TokenConvertFn token_converters[] = {
     lit_token_convert,
@@ -110,7 +111,8 @@ static const KshValueType tok_to_val_type_map[] = {
     [TOKEN_TYPE_BOOL]   = KSH_VALUE_TYPE_BOOL,
 };
 
-// PUBLIC FUNCTIONS
+
+
 const char *ksh_lexer_token_type_to_string(TokenType tt)
 {
     switch (tt) {
@@ -243,42 +245,6 @@ KshErr ksh_parse(Lexer *lex, Terminal *term)
     return KSH_ERR_OK;
 }
 
-// bool ksh_parser_parse_cmd_call(Parser *p, CommandCall *cmd_call, KshErr *err)
-// {
-//     Token tok;
-// 
-//     *err = ksh_lexer_expect_next_token(p->lex, TOKEN_TYPE_LIT, &tok);
-//     if (err != KSH_ERR_OK) return false;
-// 
-//     Command *cmd = ksh_cmd_find(p->info.cmds, tok.text);
-//     if (cmd == NULL) {
-//         KSH_LOG_ERR("command not found: `"STRV_FMT"`", STRV_ARG(tok.text));
-//         *err = KSH_ERR_COMMAND_NOT_FOUND;
-//         return false;
-//     }
-// 
-//     CommandCall cmd_call = ksh_cmd_create_call(cmd);
-//     while (ksh_parser_parse_arg(p, cmd_call, err));
-//     if (*err != KSH_ERR_OK) return false;
-// }
-// 
-// bool ksh_parser_parse_arg(Parser *p, CommandCall *cmd_call, KshErr *err)
-// {
-//     Token tok;
-//     if (!ksh_lexer_next_token(p->lex, &tok)) return false;
-//     
-//     if (ksh_lexer_peek_token(p->lex, &tok)
-//         && tok.type == TOKEN_TYPE_EQ) {
-//     } else {
-//         *err = ksh_token_parse_to_arg(tok, cmd_call->argv[0]);
-//         if (*err != KSH_ERR_OK) return false;
-//     }
-// 
-//     if (!ksh_lexer_next_token(p->lex, &tok)) return false;
-// 
-// }
-
-// PRIVATE FUNCTIONS
 static bool parse_spec_sym_token(StrView sv, SpecialSymbol *spec_sym, Token *out)
 {
     if (spec_sym->symbol == sv.items[0]) {
