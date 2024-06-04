@@ -91,6 +91,27 @@ static const CmdCallWorkflowFn cmd_call_workflow[] = {
     args_eval_fn,
 };
 
+typedef KshErr (*TokenConvertFn)(Token tok, KshValue *dest);
+
+static KshErr lit_token_convert(Token, KshValue*);
+static KshErr string_token_convert(Token, KshValue*);
+static KshErr number_token_convert(Token, KshValue*);
+static KshErr bool_token_convert(Token, KshValue*);
+
+static const TokenConvertFn token_converters[] = {
+    lit_token_convert,
+    string_token_convert,
+    number_token_convert,
+    bool_token_convert,
+};
+
+static const KshValueType tok_to_val_type_map[] = {
+    [TOKEN_TYPE_STRING] = KSH_VALUE_TYPE_STR,
+    [TOKEN_TYPE_LIT]    = KSH_VALUE_TYPE_STR,
+    [TOKEN_TYPE_NUMBER] = KSH_VALUE_TYPE_INT,
+    [TOKEN_TYPE_BOOL]   = KSH_VALUE_TYPE_BOOL,
+};
+
 // PUBLIC FUNCTIONS
 const char *ksh_lexer_token_type_to_string(TokenType tt)
 {
@@ -189,31 +210,13 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
 
 KshErr ksh_token_init_value(Token tok, KshValueType type, KshValue *dest)
 {
-    switch (type) {
-        case KSH_VALUE_TYPE_STR:
-            if (tok.type == TOKEN_TYPE_LIT)
-                dest->as_str = tok.text;
-            else if (tok.type == TOKEN_TYPE_STRING)
-                dest->as_str = strv_new(&tok.text.items[1], tok.text.len-2);
-            else break;
-            return KSH_ERR_OK;
-        case KSH_VALUE_TYPE_INT:
-            if (tok.type != TOKEN_TYPE_NUMBER) break;
-            char *num_txt = (char *) malloc(tok.text.len);
-            memcpy(num_txt, tok.text.items, tok.text.len);
-            dest->as_int = atoi(num_txt);
-            free(num_txt);
-            return KSH_ERR_OK;
-        case KSH_VALUE_TYPE_BOOL:
-            if (tok.type != TOKEN_TYPE_BOOL) break;
-            dest->as_bool = tok.text.items[0] == 't' ? 1 : 0;
-            return KSH_ERR_OK;
-        case KSH_VALUE_TYPE_ANY:
-            dest->as_str = tok.text;
-            return KSH_ERR_OK;
-    }
+    if (type != KSH_VALUE_TYPE_ANY)
+        if (tok.type >= STATIC_ARR_LEN(tok_to_val_type_map) ||
+            tok_to_val_type_map[tok.type] != type) {
+            return KSH_ERR_TYPE_EXPECTED;
+        }
 
-    return KSH_ERR_TYPE_EXPECTED;
+    return token_converters[tok.type](tok, dest);
 }
 
 KshErr ksh_parse(Lexer *lex, Terminal *term)
@@ -439,9 +442,44 @@ static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit)
         }
 
         KshErr err = ksh_token_init_value(arg_val, arg->def->type, &arg->value);
-        if (err != KSH_ERR_OK) return err;
+        if (err != KSH_ERR_OK) {
+            if (err == KSH_ERR_TYPE_EXPECTED) {
+                KSH_LOG_ERR("arg `"STRV_FMT"`: expected type: <%s>",
+                            STRV_ARG(arg->def->name),
+                            ksh_val_type_str(arg->def->type));
+            }
+            return err;
+        }
         arg->is_assign = true;
     }
 
+    return KSH_ERR_OK;
+}
+
+static KshErr lit_token_convert(Token tok, KshValue *dest)
+{
+    dest->as_str = tok.text;
+    return KSH_ERR_OK;
+}
+
+static KshErr string_token_convert(Token tok, KshValue *dest)
+{
+    dest->as_str = strv_new(&tok.text.items[1], tok.text.len-2);
+    return KSH_ERR_OK;
+}
+
+static KshErr number_token_convert(Token tok, KshValue *dest)
+{
+    char *num_buf = (char *) malloc(tok.text.len);
+    if (!num_buf) return KSH_ERR_MEM_OVER;
+    memcpy(num_buf, tok.text.items, tok.text.len);
+    dest->as_int = atoi(num_buf);
+    free(num_buf);
+    return KSH_ERR_OK;
+}
+
+static KshErr bool_token_convert(Token tok, KshValue *dest)
+{
+    dest->as_bool = tok.text.items[0] == 't' ? 1 : 0;
     return KSH_ERR_OK;
 }
