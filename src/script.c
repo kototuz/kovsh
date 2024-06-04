@@ -394,7 +394,7 @@ static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit)
             return KSH_ERR_ARG_NOT_FOUND;
         }
 
-        KshErr err = ksh_token_init_value(arg_val, arg->def->type, &arg->value);
+        KshErr err = ksh_token_parse_to_value(arg_val, arg->def->type, &arg->value);
         if (err != KSH_ERR_OK) {
             if (err == KSH_ERR_TYPE_EXPECTED) {
                 KSH_LOG_ERR("arg `"STRV_FMT"`: expected type: <%s>",
