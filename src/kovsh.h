@@ -27,7 +27,8 @@ typedef enum {
     KSH_ERR_TYPE_EXPECTED,
     KSH_ERR_ASSIGNMENT_EXPECTED,
     KSH_ERR_MEM_OVER,
-    KSH_ERR_PATTERN_NOT_FOUND
+    KSH_ERR_PATTERN_NOT_FOUND,
+    KSH_ERR_VAR_NOT_FOUND
 } KshErr;
 
 typedef struct {
@@ -176,6 +177,19 @@ typedef struct {
     bool        should_exit;
 } Terminal;
 
+typedef struct {
+    StrView name;
+    struct {
+        char  *items;
+        size_t len;
+    } value;
+    bool    is_mutable;
+} Variable;
+
+KshErr ksh_var_add(Variable var);
+KshErr ksh_var_get_val(StrView name, StrView *dest);
+KshErr ksh_var_set_val(StrView name, StrView value);
+
 void ksh_term_add_command(Command cmd);
 void ksh_term_set_prompt(Prompt p);
 void ksh_term_set_mod(TerminalMod mod);
@@ -197,6 +211,7 @@ typedef enum {
     TOKEN_TYPE_STRING,
     TOKEN_TYPE_NUMBER,
     TOKEN_TYPE_BOOL,
+    TOKEN_TYPE_VAR,
     TOKEN_TYPE_EQ,
     TOKEN_TYPE_KEYWORD_SYS,
     TOKEN_TYPE_INVALID,

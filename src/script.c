@@ -44,14 +44,10 @@ static bool parse_string_token(StrView sv, void *ctx, Token *out);
 static bool parse_variety_token(StrView sv, Variety *ctx, Token *out);
 static bool parse_keyword_token(StrView sv, Keyword *ctx, Token *out);
 static bool parse_spec_sym_token(StrView sv, SpecialSymbol *ctx, Token *out);
+static bool parse_var_token(StrView sv, void *ctx, Token *out);
 
 static KshErr cmd_eval_fn(Lexer *lex, Terminal *term, bool *exit);
 static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit);
-
-static KshErr lit_token_convert(Token, KshValue*);
-static KshErr string_token_convert(Token, KshValue*);
-static KshErr number_token_convert(Token, KshValue*);
-static KshErr bool_token_convert(Token, KshValue*);
 
 
 
@@ -89,19 +85,13 @@ static const struct TokenParser {
     { .db = keyword_db, .parse_fn = (ParseFn) parse_keyword_token },
     { .db = special_symbol_db, .parse_fn = (ParseFn) parse_spec_sym_token },
     { .db = variety_db, .parse_fn = (ParseFn) parse_variety_token },
-    { .parse_fn = (ParseFn) parse_string_token }
+    { .parse_fn = (ParseFn) parse_string_token },
+    { .parse_fn = (ParseFn) parse_var_token }
 };
 
 static const CmdCallWorkflowFn cmd_call_workflow[] = {
     cmd_eval_fn,
     args_eval_fn,
-};
-
-static const TokenConvertFn token_converters[] = {
-    lit_token_convert,
-    string_token_convert,
-    number_token_convert,
-    bool_token_convert,
 };
 
 static const KshValueType tok_to_val_type_map[] = {
@@ -191,15 +181,53 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
     return KSH_ERR_OK;
 }
 
-KshErr ksh_token_init_value(Token tok, KshValueType type, KshValue *dest)
+KshErr ksh_token_parse_to_value(Token tok, KshValueType type, KshValue *dest)
 {
-    if (type != KSH_VALUE_TYPE_ANY)
-        if (tok.type >= STATIC_ARR_LEN(tok_to_val_type_map) ||
-            tok_to_val_type_map[tok.type] != type) {
-            return KSH_ERR_TYPE_EXPECTED;
-        }
+    if (type == KSH_VALUE_TYPE_ANY) {
+        dest->as_str = tok.text;
+        return KSH_ERR_OK;
+    }
 
-    return token_converters[tok.type](tok, dest);
+    if (tok.type != TOKEN_TYPE_VAR)
+        if (tok.type >= STATIC_ARR_LEN(tok_to_val_type_map) ||
+            tok_to_val_type_map[tok.type] != type)
+            return KSH_ERR_TYPE_EXPECTED;
+
+    KshErr err;
+    switch (tok.type) {
+        case TOKEN_TYPE_LIT:
+            dest->as_str = tok.text;
+            break;
+        case TOKEN_TYPE_STRING:
+            dest->as_str = strv_new(&tok.text.items[1], tok.text.len-2);
+            break;
+        case TOKEN_TYPE_NUMBER:;
+            char *num_buf = (char *) malloc(tok.text.len);
+            if (!num_buf) return KSH_ERR_MEM_OVER;
+            memcpy(num_buf, tok.text.items, tok.text.len);
+            dest->as_int = atoi(num_buf);
+            free(num_buf);
+            break;
+        case TOKEN_TYPE_BOOL:
+            dest->as_bool = tok.text.items[0] == 't' ? 1 : 0;
+            break;
+        case TOKEN_TYPE_VAR:;
+            StrView value;
+            Token token;
+            err = ksh_var_get_val((StrView){
+                .items = &tok.text.items[1],
+                .len = tok.text.len-1
+            }, &value);
+            if (err != KSH_ERR_OK) return err;
+            err = ksh_token_from_strv(value, &token);
+            if (err != KSH_ERR_OK) return err;
+            err = ksh_token_parse_to_value(token, type, dest);
+            if (err != KSH_ERR_OK) return err;
+            break;
+        default: return KSH_ERR_TYPE_EXPECTED;
+    }
+
+    return KSH_ERR_OK;
 }
 
 KshErr ksh_token_from_strv(StrView sv, Token *dest)
@@ -321,6 +349,27 @@ static bool parse_string_token(StrView sv, void *ctx, Token *out)
     return false;
 }
 
+static bool parse_var_token(StrView sv, void *ctx, Token *out)
+{
+    (void) ctx;
+    if (sv.items[0] != '@') return false;
+
+    if (!parse_variety_token(
+            (StrView){
+                .items = &sv.items[1],
+                .len = sv.len-1
+            },
+            &(Variety){ 0, is_lit },
+            out
+        )) return false;
+
+    out->text.items = sv.items;
+    out->text.len++;
+    out->type = TOKEN_TYPE_VAR;
+
+    return true;
+}
+
 static void lexer_inc(Lexer *l, size_t inc)
 {
     assert(l->cursor + inc <= l->text.len);
@@ -406,33 +455,5 @@ static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit)
         arg->is_assign = true;
     }
 
-    return KSH_ERR_OK;
-}
-
-static KshErr lit_token_convert(Token tok, KshValue *dest)
-{
-    dest->as_str = tok.text;
-    return KSH_ERR_OK;
-}
-
-static KshErr string_token_convert(Token tok, KshValue *dest)
-{
-    dest->as_str = strv_new(&tok.text.items[1], tok.text.len-2);
-    return KSH_ERR_OK;
-}
-
-static KshErr number_token_convert(Token tok, KshValue *dest)
-{
-    char *num_buf = (char *) malloc(tok.text.len);
-    if (!num_buf) return KSH_ERR_MEM_OVER;
-    memcpy(num_buf, tok.text.items, tok.text.len);
-    dest->as_int = atoi(num_buf);
-    free(num_buf);
-    return KSH_ERR_OK;
-}
-
-static KshErr bool_token_convert(Token tok, KshValue *dest)
-{
-    dest->as_bool = tok.text.items[0] == 't' ? 1 : 0;
     return KSH_ERR_OK;
 }
