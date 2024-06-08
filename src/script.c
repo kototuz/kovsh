@@ -30,7 +30,7 @@ typedef struct {
 } Variety;
 
 typedef bool (*ParseFn)(StrView sv, void *ctx, Token *out);
-typedef KshErr (*CmdCallWorkflowFn)(Lexer *l, Terminal *term, bool *exit);
+// typedef KshErr (*CmdCallWorkflowFn)(Lexer *l, Terminal *term, bool *exit);
 typedef KshErr (*TokenConvertFn)(Token tok, KshValue *dest);
 
 
@@ -46,8 +46,8 @@ static bool parse_keyword_token(StrView sv, Keyword *ctx, Token *out);
 static bool parse_spec_sym_token(StrView sv, SpecialSymbol *ctx, Token *out);
 static bool parse_var_token(StrView sv, void *ctx, Token *out);
 
-static KshErr cmd_eval_fn(Lexer *lex, Terminal *term, bool *exit);
-static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit);
+// static KshErr cmd_eval_fn(Lexer *lex, Terminal *term, bool *exit);
+// static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit);
 
 
 
@@ -89,10 +89,10 @@ static const struct TokenParser {
     { .parse_fn = (ParseFn) parse_var_token }
 };
 
-static const CmdCallWorkflowFn cmd_call_workflow[] = {
-    cmd_eval_fn,
-    args_eval_fn,
-};
+// static const CmdCallWorkflowFn cmd_call_workflow[] = {
+//     cmd_eval_fn,
+//     args_eval_fn,
+// };
 
 static const KshValueType tok_to_val_type_map[] = {
     [TOKEN_TYPE_STRING] = KSH_VALUE_TYPE_STR,
@@ -255,31 +255,31 @@ KshErr ksh_token_type_to_value(TokenType t, KshValueType *dest)
     return KSH_ERR_OK;
 }
 
-KshErr ksh_parse(Lexer *lex, Terminal *term)
-{
-    KshErr err;
-    for (;;) {
-        bool exit = false;
-        for (size_t i = 0; i < STATIC_ARR_LEN(cmd_call_workflow); i++) {
-            err = cmd_call_workflow[i](lex, term, &exit);
-            if (err != KSH_ERR_OK) return err;
-            if (exit) return KSH_ERR_OK;
-        }
-
-        err = ksh_cmd_call_exec(term->cur_cmd_call);
-        if (err != KSH_ERR_OK) return err;
-
-        Token tok;
-        if (!ksh_lexer_peek_token(lex, &tok)
-            || tok.type != TOKEN_TYPE_PLUS) {
-            break;
-        }
-
-        ksh_lexer_next_token(lex, &tok);
-    }
-
-    return KSH_ERR_OK;
-}
+// KshErr ksh_parse(Lexer *lex, Terminal *term)
+// {
+//     KshErr err;
+//     for (;;) {
+//         bool exit = false;
+//         for (size_t i = 0; i < STATIC_ARR_LEN(cmd_call_workflow); i++) {
+//             err = cmd_call_workflow[i](lex, term, &exit);
+//             if (err != KSH_ERR_OK) return err;
+//             if (exit) return KSH_ERR_OK;
+//         }
+// 
+//         err = ksh_cmd_call_exec(term->cur_cmd_call);
+//         if (err != KSH_ERR_OK) return err;
+// 
+//         Token tok;
+//         if (!ksh_lexer_peek_token(lex, &tok)
+//             || tok.type != TOKEN_TYPE_PLUS) {
+//             break;
+//         }
+// 
+//         ksh_lexer_next_token(lex, &tok);
+//     }
+// 
+//     return KSH_ERR_OK;
+// }
 
 static bool parse_spec_sym_token(StrView sv, SpecialSymbol *spec_sym, Token *out)
 {
@@ -388,72 +388,72 @@ static bool is_lit(int letter)
            || ('0' <= letter && letter <= '9');
 }
 
-static KshErr cmd_eval_fn(Lexer *l, Terminal *term, bool *exit)
-{
-    Token tok;
-    if (!ksh_lexer_peek_token(l, &tok)) {
-        *exit = true;
-        return KSH_ERR_OK;
-    }
-
-    KshErr err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &tok);
-    if (err != KSH_ERR_OK) return err;
-
-    Command *cmd = ksh_cmd_find(term->commands, tok.text);
-    if (cmd == NULL) {
-        KSH_LOG_ERR("command not found: `"STRV_FMT"`", STRV_ARG(tok.text));
-        return KSH_ERR_COMMAND_NOT_FOUND;
-    }
-
-    term->cur_cmd_call = ksh_cmd_create_call(cmd);
-
-    return KSH_ERR_OK;
-}
-
-static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit)
-{
-    (void) exit;
-    assert(term->cur_cmd_call.cmd);
-
-    Arg *arg;
-    Token arg_name;
-    Token arg_val;
-    while (ksh_lexer_peek_token(lex, &arg_name) &&
-           arg_name.type != TOKEN_TYPE_PLUS) {
-        ksh_lexer_next_token(lex, &arg_name);
-        if (arg_name.type == TOKEN_TYPE_LIT &&
-            ksh_lexer_next_token_if(lex, TOKEN_TYPE_EQ, &arg_val) &&
-            ksh_lexer_next_token(lex, &arg_val))
-        {
-            arg = ksh_args_find(term->cur_cmd_call.argc,
-                                term->cur_cmd_call.argv,
-                                arg_name.text);
-            term->cur_cmd_call.last_assigned_arg_idx = arg - term->cur_cmd_call.argv + 1;
-        } else {
-            if (term->cur_cmd_call.last_assigned_arg_idx >= term->cur_cmd_call.argc) {
-                KSH_LOG_ERR("last arg not found%s", "");
-                return KSH_ERR_ARG_NOT_FOUND;
-            }
-            arg_val = arg_name;
-            arg = &term->cur_cmd_call.argv[term->cur_cmd_call.last_assigned_arg_idx++];
-        }
-
-        if (arg == NULL) {
-            KSH_LOG_ERR("arg not found: `"STRV_FMT"`", STRV_ARG(arg_name.text));
-            return KSH_ERR_ARG_NOT_FOUND;
-        }
-
-        KshErr err = ksh_token_parse_to_value(arg_val, arg->def->type, &arg->value);
-        if (err != KSH_ERR_OK) {
-            if (err == KSH_ERR_TYPE_EXPECTED) {
-                KSH_LOG_ERR("arg `"STRV_FMT"`: expected type: <%s>",
-                            STRV_ARG(arg->def->name),
-                            ksh_val_type_str(arg->def->type));
-            }
-            return err;
-        }
-        arg->is_assign = true;
-    }
-
-    return KSH_ERR_OK;
-}
+// static KshErr cmd_eval_fn(Lexer *l, Terminal *term, bool *exit)
+// {
+//     Token tok;
+//     if (!ksh_lexer_peek_token(l, &tok)) {
+//         *exit = true;
+//         return KSH_ERR_OK;
+//     }
+// 
+//     KshErr err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &tok);
+//     if (err != KSH_ERR_OK) return err;
+// 
+//     Command *cmd = ksh_cmd_find(term->commands, tok.text);
+//     if (cmd == NULL) {
+//         KSH_LOG_ERR("command not found: `"STRV_FMT"`", STRV_ARG(tok.text));
+//         return KSH_ERR_COMMAND_NOT_FOUND;
+//     }
+// 
+//     term->cur_cmd_call = ksh_cmd_create_call(cmd);
+// 
+//     return KSH_ERR_OK;
+// }
+// 
+// static KshErr args_eval_fn(Lexer *lex, Terminal *term, bool *exit)
+// {
+//     (void) exit;
+//     assert(term->cur_cmd_call.cmd);
+// 
+//     Arg *arg;
+//     Token arg_name;
+//     Token arg_val;
+//     while (ksh_lexer_peek_token(lex, &arg_name) &&
+//            arg_name.type != TOKEN_TYPE_PLUS) {
+//         ksh_lexer_next_token(lex, &arg_name);
+//         if (arg_name.type == TOKEN_TYPE_LIT &&
+//             ksh_lexer_next_token_if(lex, TOKEN_TYPE_EQ, &arg_val) &&
+//             ksh_lexer_next_token(lex, &arg_val))
+//         {
+//             arg = ksh_args_find(term->cur_cmd_call.argc,
+//                                 term->cur_cmd_call.argv,
+//                                 arg_name.text);
+//             term->cur_cmd_call.last_assigned_arg_idx = arg - term->cur_cmd_call.argv + 1;
+//         } else {
+//             if (term->cur_cmd_call.last_assigned_arg_idx >= term->cur_cmd_call.argc) {
+//                 KSH_LOG_ERR("last arg not found%s", "");
+//                 return KSH_ERR_ARG_NOT_FOUND;
+//             }
+//             arg_val = arg_name;
+//             arg = &term->cur_cmd_call.argv[term->cur_cmd_call.last_assigned_arg_idx++];
+//         }
+// 
+//         if (arg == NULL) {
+//             KSH_LOG_ERR("arg not found: `"STRV_FMT"`", STRV_ARG(arg_name.text));
+//             return KSH_ERR_ARG_NOT_FOUND;
+//         }
+// 
+//         KshErr err = ksh_token_parse_to_value(arg_val, arg->def->type, &arg->value);
+//         if (err != KSH_ERR_OK) {
+//             if (err == KSH_ERR_TYPE_EXPECTED) {
+//                 KSH_LOG_ERR("arg `"STRV_FMT"`: expected type: <%s>",
+//                             STRV_ARG(arg->def->name),
+//                             ksh_val_type_str(arg->def->type));
+//             }
+//             return err;
+//         }
+//         arg->is_assign = true;
+//     }
+// 
+//     return KSH_ERR_OK;
+// }

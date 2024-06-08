@@ -2,7 +2,6 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
-#include <ncurses.h>
 
 static KshErr handle_arg_assignment(Arg *arg)
 {
@@ -29,25 +28,19 @@ Arg *cmd_call_find_arg(CommandCall cmd_call, StrView arg_name)
     return NULL;
 }
 
-static const TermTextPrefs info_text_prefs = { .fg_color = TERM_COLOR_YELLOW };
 void ksh_cmd_print(Command cmd)
 {
-    ksh_termio_print(info_text_prefs,
-                     "[COMMAND]:\t"STRV_FMT"\n",
-                     STRV_ARG(cmd.name));
-    ksh_termio_print(info_text_prefs,
-                     "[DESCRIPTION]:\t%s\n",
-                     cmd.desc);
+    printf("[COMMAND]:\t"STRV_FMT"\n", STRV_ARG(cmd.name));
+    printf("[DESCRIPTION]:\t%s\n", cmd.desc);
 
     if (cmd.arg_defs_len < 1) return;
 
-    ksh_termio_print(info_text_prefs, "[ARGS]:%s\n", "");
+    puts("[ARGS]:%s");
     for (size_t i = 0; i < cmd.arg_defs_len; i++) {
-        ksh_termio_print(info_text_prefs,
-                         "\t"STRV_FMT"=<%s>\t%s\n",
-                         STRV_ARG(cmd.arg_defs[i].name),
-                         ksh_val_type_str(cmd.arg_defs[i].type),
-                         cmd.arg_defs[i].usage);
+        printf("\t"STRV_FMT"=<%s>\t%s\n",
+               STRV_ARG(cmd.arg_defs[i].name),
+               ksh_val_type_str(cmd.arg_defs[i].type),
+               cmd.arg_defs[i].usage);
     }
 }
 
@@ -114,13 +107,9 @@ KshErr ksh_cmd_call_exec(CommandCall cmd_call)
         args[i] = cmd_call.argv[i].value;
     }
 
-    int call_result = cmd_call.cmd->fn(args);
-    free(args);
-    if (call_result) {
-        ksh_termio_print((TermTextPrefs){ .fg_color = TERM_COLOR_RED, .mode.bold = true },
-                         "the command returned err: %d\n", call_result);
-    }
+    cmd_call.cmd->fn(args);
 
+    free(args);
     free(cmd_call.argv);
     return KSH_ERR_OK;
 }

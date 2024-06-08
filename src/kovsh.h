@@ -12,8 +12,7 @@
 /// COMMON
 //////////////////////////////////////////////
 
-#define KSH_LOG_ERR(msg, ...) \
-  (ksh_termio_print((TermTextPrefs){.fg_color = TERM_COLOR_RED, .mode.bold = true}, "[KOVSH ERR]: "msg"\n", __VA_ARGS__))
+#define KSH_LOG_ERR(msg, ...) printf("[KOVSH ERR]: "msg, __VA_ARGS__)
 
 #define STRV_LIT(lit) { sizeof(lit)-1, (lit) }
 #define STRV_FMT "%.*s"
@@ -111,97 +110,6 @@ void ksh_arg_def_print(ArgDef cmd_arg);
 
 Arg *ksh_args_find(size_t argc, Arg argv[argc], StrView sv);
 
-
-///////////////////////////////////////////////
-/// TERM
-//////////////////////////////////////////////
-
-#define TERMIO_NCURSES 0
-#define TERMIO_DEFAULT 1
-#ifndef TERMIO
-#  define TERMIO TERMIO_DEFAULT
-#endif
-
-#define TERM_COLOR_COUNT (TERM_COLOR_END-1)
-typedef enum {
-    TERM_COLOR_BLACK = 1,
-    TERM_COLOR_RED,
-    TERM_COLOR_GREEN,
-    TERM_COLOR_YELLOW,
-    TERM_COLOR_BLUE,
-    TERM_COLOR_MAGENTA,
-    TERM_COLOR_CYAN,
-    TERM_COLOR_WHITE,
-
-    TERM_COLOR_END
-} TermColor;
-
-#define TERM_TEXT_MODE_COUNT 5
-typedef struct {
-    bool bold;
-    bool italic;
-    bool underscored;
-    bool blink;
-    bool strikethrough;
-} TermTextMode;
-static_assert(TERM_TEXT_MODE_COUNT == (sizeof(TermTextMode) / sizeof(bool)), "unsupported modes");
-
-typedef struct {
-    TermColor fg_color;
-    TermColor bg_color;
-    TermTextMode mode;
-} TermTextPrefs;
-
-typedef struct {
-    const char *text;
-    TermTextPrefs text_prefs;
-    bool overrides_global;
-} PromptPart;
-
-typedef struct {
-    PromptPart   *parts;
-    size_t        parts_len;
-    TermTextPrefs global_prefs;
-} Prompt;
-
-typedef enum {
-    TERMINAL_MOD_DEF,
-    TERMINAL_MOD_SYS,
-} TerminalMod;
-
-typedef struct {
-    CommandBuf  commands;
-    Prompt      prompt;
-    TerminalMod mod;
-    CommandCall cur_cmd_call;
-    bool        should_exit;
-} Terminal;
-
-typedef struct {
-    StrView name;
-    struct {
-        char  *items;
-        size_t len;
-    } value;
-    bool    is_mutable;
-} Variable;
-
-KshErr ksh_var_add(Variable var);
-KshErr ksh_var_get_val(StrView name, StrView *dest);
-KshErr ksh_var_set_val(StrView name, StrView value);
-
-void ksh_term_add_command(Command cmd);
-void ksh_term_set_prompt(Prompt p);
-void ksh_term_set_mod(TerminalMod mod);
-void ksh_term_run(void);
-
-void ksh_prompt_print(Prompt p);
-
-void ksh_termio_init(void);
-void ksh_termio_print(TermTextPrefs prefs, const char *fmt, ...);
-void ksh_termio_getline(size_t size, char buf[size]);
-void ksh_termio_end(void);
-
 ///////////////////////////////////////////////
 /// LEXER
 //////////////////////////////////////////////
@@ -244,6 +152,29 @@ KshErr ksh_token_parse_to_value(Token tok, KshValueType type, KshValue *dest);
 KshErr ksh_token_from_strv(StrView sv, Token *dest);
 KshErr ksh_token_type_to_value(TokenType t, KshValueType *dest);
 
-KshErr ksh_parse(Lexer *lex, Terminal *term);
+///////////////////////////////////////////////
+/// MAIN USAGE
+//////////////////////////////////////////////
+
+typedef struct {
+    StrView name;
+    struct {
+        char  *items;
+        size_t len;
+    } value;
+    bool    is_mutable;
+} Variable;
+
+void ksh_init(void);
+void ksh_deinit(void);
+
+KshErr ksh_parse(StrView, CommandCall *dest);
+
+void ksh_add_command(Command);
+
+void   ksh_var_add(Variable var);
+KshErr ksh_var_get_val(StrView name, StrView *dest);
+KshErr ksh_var_set_val(StrView name, StrView value);
+
 
 #endif

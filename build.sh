@@ -1,7 +1,7 @@
 #!/bin/bash
 
-mkdir -p zig-out/objs
-mkdir -p zig-out/bin
+mkdir -p out/objs
+mkdir -p out/bin
 
 cc=gcc
 main=src/main.c
@@ -28,17 +28,10 @@ if [ $# -eq 1 ]; then
         "clean")
             rm -rf $obj_dir/* $bin_dir/*
             ;;
-        "run")
-            $cc -o $bin_dir/main $main $obj_dir/*.o
-            echo "$cc -o $bin_dir/main $main $obj_dir/*.o"
-            ./$bin_dir/main
-            ;;
     esac
 else
     for s in $sources
     do
-        if [ $s != "src/main.c" ]; then
-            build_obj $s
-        fi
+        build_obj $s
     done
 fi
