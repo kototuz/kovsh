@@ -9,6 +9,10 @@ static int some(KshValue *args)
 
 int main(void)
 {
+    StrView prompt;
+    CommandCall cmd_call;
+    KshErr err;
+
     ksh_init();
 
     ksh_add_command((Command){
@@ -16,12 +20,20 @@ int main(void)
         .fn = some
     });
 
-    StrView prompt = STRV_LIT("some");
+    prompt = (StrView)STRV_LIT("set da hello");
+    err = ksh_parse(prompt, &cmd_call);
+    if (err != KSH_ERR_OK) {
+        puts("ERROR");
+        return err;
+    }
+    ksh_cmd_call_exec(cmd_call);
 
-    CommandCall cmd_call;
-    KshErr err = ksh_parse(prompt, &cmd_call);
-    if (err != KSH_ERR_OK) return err;
-
+    prompt = (StrView)STRV_LIT("print @da");
+    err = ksh_parse(prompt, &cmd_call);
+    if (err != KSH_ERR_OK) {
+        puts("ERROR");
+        return err;
+    }
     ksh_cmd_call_exec(cmd_call);
 
     ksh_deinit();

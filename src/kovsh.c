@@ -21,12 +21,13 @@
 static void init_builtin_variables(void);
 
 static Variable *find_var(StrView name);
+static Variable *find_usr_var(StrView name);
 
 static KshErr cmd_eval(Lexer *lex, CommandCall *cmd_call);
 static KshErr args_eval(Lexer *lex, CommandCall *cmd_call);
 
 static int builtin_print(KshValue *args);
-
+static int builtin_set_var(KshValue *args);
 
 static int command_cursor = BUILTIN_CMDS_LEN;
 static Command cmd_arr[CMDS_LEN] = {
@@ -38,6 +39,22 @@ static Command cmd_arr[CMDS_LEN] = {
         .arg_defs = (ArgDef[]){
             {
                 .name = STRV_LIT("msg"),
+                .type = KSH_VALUE_TYPE_STR
+            }
+        }
+    },
+    {
+        .name = STRV_LIT("set"),
+        .desc = "Set a variable new value or create new",
+        .fn = builtin_set_var,
+        .arg_defs_len = 2,
+        .arg_defs = (ArgDef[]){
+            {
+                .name = STRV_LIT("name"),
+                .type = KSH_VALUE_TYPE_STR,
+            },
+            {
+                .name = STRV_LIT("value"),
                 .type = KSH_VALUE_TYPE_STR
             }
         }
@@ -92,12 +109,27 @@ void ksh_add_command(Command cmd)
     commands.items[command_cursor++] = cmd;
 }
 
-void ksh_var_add(Variable var)
+KshErr ksh_var_add(const StrView name, const StrView value)
 {
     assert(variable_cursor+1 < VARS_LEN);
-    assert(var.name.items);
-    assert(var.value.items);
-    variables[variable_cursor++] = var;
+    assert(name.items);
+    assert(value.items);
+
+    char *name_buf = (char *) malloc(name.len);
+    char *value_buf = (char *) malloc(value.len);
+    if (!name_buf || !value_buf) return KSH_ERR_MEM_OVER;
+
+    memcpy(name_buf, name.items, name.len);
+    memcpy(value_buf, value.items, value.len);
+
+    variables[variable_cursor++] = (Variable){
+        .name.items = name_buf,
+        .name.len = name.len,
+        .value.items = value_buf,
+        .value.len = value.len
+    };
+
+    return KSH_ERR_OK;
 }
 
 KshErr ksh_var_get_val(StrView name, StrView *dest)
@@ -113,7 +145,7 @@ KshErr ksh_var_get_val(StrView name, StrView *dest)
 
 KshErr ksh_var_set_val(StrView name, StrView value)
 {
-    Variable *var = find_var(name);
+    Variable *var = find_usr_var(name);
     if (!var) return KSH_ERR_VAR_NOT_FOUND;
 
     var->value.items = (char *) realloc(var->value.items, value.len);
@@ -142,6 +174,15 @@ static void init_builtin_variables(void)
 static Variable *find_var(StrView name)
 {
     for (int i = 0; i < VARS_LEN; i++)
+        if (strv_eq(name, variables[i].name))
+            return &variables[i];
+
+    return NULL;
+}
+
+static Variable *find_usr_var(StrView name)
+{
+    for (int i = BUILTIN_VARS_LEN; i < VARS_LEN; i++)
         if (strv_eq(name, variables[i].name))
             return &variables[i];
 
@@ -216,5 +257,18 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
 static int builtin_print(KshValue *args)
 {
     printf(STRV_FMT"\n", STRV_ARG(args[0].as_str));
+    return 0;
+}
+
+static int builtin_set_var(KshValue *args)
+{
+    StrView name = args[0].as_str;
+    StrView value = args[1].as_str;
+
+    KshErr err = ksh_var_set_val(name, value);
+    if (err == KSH_ERR_VAR_NOT_FOUND) {
+        if (ksh_var_add(name, value) != KSH_ERR_OK)
+            return 1;
+
     return 0;
 }

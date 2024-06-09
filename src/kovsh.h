@@ -171,7 +171,7 @@ KshErr ksh_parse(StrView, CommandCall *dest);
 
 void ksh_add_command(Command);
 
-void   ksh_var_add(Variable var);
+KshErr ksh_var_add(const StrView name, const StrView value);
 KshErr ksh_var_get_val(StrView name, StrView *dest);
 KshErr ksh_var_set_val(StrView name, StrView value);
 
