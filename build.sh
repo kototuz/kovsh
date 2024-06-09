@@ -4,10 +4,12 @@ mkdir -p out/objs
 mkdir -p out/bin
 
 cc=gcc
+cflags="-Wall -Wextra -Wpedantic -g"
 main=src/main.c
 sources=src/*.c
 obj_dir=out/objs
 bin_dir=out/bin
+examples=examples/*.c
 
 function build_obj {
     if [ $# -eq 1 ]; then
@@ -15,8 +17,8 @@ function build_obj {
         obj=$1
         obj=${obj/.c/.o}
         obj=$obj_dir/${obj/$src_rep/}
-        $cc -o $obj -c $1
-        echo "$cc -o $obj -c $1"
+        $cc $cflags -o $obj -c $1
+        echo "$cc $cflags -o $obj -c $1"
     fi
 }
 
@@ -27,6 +29,12 @@ if [ $# -eq 1 ]; then
             ;;
         "clean")
             rm -rf $obj_dir/* $bin_dir/*
+            ;;
+        "examples")
+            for e in $examples
+            do
+                echo $(basename $e)
+            done
             ;;
     esac
 else

@@ -17,6 +17,9 @@ static void init_builtin_variables(void);
 
 static Variable *find_var(StrView name);
 
+static KshErr cmd_eval(Lexer *lex, CommandCall *cmd_call);
+static KshErr args_eval(Lexer *lex, CommandCall *cmd_call);
+
 static int builtin_print(KshValue *args);
 
 
@@ -58,6 +61,16 @@ void ksh_deinit(void)
 
 KshErr ksh_parse(StrView sv, CommandCall *dest)
 {
+    KshErr err;
+    Lexer lex = ksh_lexer_new(sv);
+
+    err = cmd_eval(&lex, dest);
+    if (err != KSH_ERR_OK) return err;
+
+    err = args_eval(&lex, dest);
+    if (err != KSH_ERR_OK) return err;
+
+    return KSH_ERR_OK;
 }
 
 void ksh_add_command(Command cmd)
@@ -118,7 +131,8 @@ static void init_builtin_variables(void)
     getlogin_r(user, 10);
     variables[0] = (Variable){
         .name = STRV_LIT("user"),
-        .value = user
+        .value.items = user,
+        .value.len = strlen(user)
     };
 }
 
@@ -129,6 +143,71 @@ static Variable *find_var(StrView name)
             return &variables[i];
 
     return NULL;
+}
+
+static KshErr cmd_eval(Lexer *l, CommandCall *cmd_call)
+{
+    Token tok;
+    KshErr err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &tok);
+    if (err != KSH_ERR_OK) return err;
+
+    Command *cmd = ksh_cmd_find(commands, tok.text);
+    if (cmd == NULL) {
+        KSH_LOG_ERR("command not found: `"STRV_FMT"`", STRV_ARG(tok.text));
+        return KSH_ERR_COMMAND_NOT_FOUND;
+    }
+
+    *cmd_call = ksh_cmd_create_call(cmd);
+
+    return KSH_ERR_OK;
+}
+
+static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
+{
+    (void) exit;
+    assert(cmd_call->cmd);
+
+    Arg *arg;
+    Token arg_name;
+    Token arg_val;
+    while (ksh_lexer_peek_token(lex, &arg_name) &&
+           arg_name.type != TOKEN_TYPE_PLUS) {
+        ksh_lexer_next_token(lex, &arg_name);
+        if (arg_name.type == TOKEN_TYPE_LIT &&
+            ksh_lexer_next_token_if(lex, TOKEN_TYPE_EQ, &arg_val) &&
+            ksh_lexer_next_token(lex, &arg_val))
+        {
+            arg = ksh_args_find(cmd_call->argc,
+                                cmd_call->argv,
+                                arg_name.text);
+            cmd_call->last_assigned_arg_idx = arg - cmd_call->argv + 1;
+        } else {
+            if (cmd_call->last_assigned_arg_idx >= cmd_call->argc) {
+                KSH_LOG_ERR("last arg not found%s", "");
+                return KSH_ERR_ARG_NOT_FOUND;
+            }
+            arg_val = arg_name;
+            arg = &cmd_call->argv[cmd_call->last_assigned_arg_idx++];
+        }
+
+        if (arg == NULL) {
+            KSH_LOG_ERR("arg not found: `"STRV_FMT"`", STRV_ARG(arg_name.text));
+            return KSH_ERR_ARG_NOT_FOUND;
+        }
+
+        KshErr err = ksh_token_parse_to_value(arg_val, arg->def->type, &arg->value);
+        if (err != KSH_ERR_OK) {
+            if (err == KSH_ERR_TYPE_EXPECTED) {
+                KSH_LOG_ERR("arg `"STRV_FMT"`: expected type: <%s>",
+                            STRV_ARG(arg->def->name),
+                            ksh_val_type_str(arg->def->type));
+            }
+            return err;
+        }
+        arg->is_assign = true;
+    }
+
+    return KSH_ERR_OK;
 }
 
 static int builtin_print(KshValue *args)
