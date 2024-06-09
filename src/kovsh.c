@@ -4,14 +4,19 @@
 #include <string.h>
 #include <stdlib.h>
 
-#ifndef COMMANDS_LEN
-#   define COMMANDS_LEN 128
+#define BUILTIN_VARS_LEN 1
+#define BUILTIN_CMDS_LEN 2
+
+#ifndef USR_CMDS_LEN
+#   define USR_CMDS_LEN 128
 #endif
 
-#ifndef VARIABLES_LEN
-#   define VARIABLES_LEN 128
+#ifndef USR_VARS_LEN
+#   define USR_VARS_LEN 128
 #endif
 
+#define CMDS_LEN (BUILTIN_CMDS_LEN + USR_CMDS_LEN)
+#define VARS_LEN (BUILTIN_VARS_LEN + USR_VARS_LEN)
 
 static void init_builtin_variables(void);
 
@@ -23,30 +28,25 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call);
 static int builtin_print(KshValue *args);
 
 
-
-#define BUILTIN_CMDS_LEN 2
 static int command_cursor = BUILTIN_CMDS_LEN;
-static CommandBuf commands = {
-    .items = (Command[]){
-        {
-            .name = STRV_LIT("print"),
-            .desc = "Prints a message",
-            .fn = builtin_print,
-            .arg_defs_len = 1,
-            .arg_defs = (ArgDef[]){
-                {
-                    .name = STRV_LIT("msg"),
-                    .type = KSH_VALUE_TYPE_STR
-                }
+static Command cmd_arr[CMDS_LEN] = {
+    {
+        .name = STRV_LIT("print"),
+        .desc = "Prints a message",
+        .fn = builtin_print,
+        .arg_defs_len = 1,
+        .arg_defs = (ArgDef[]){
+            {
+                .name = STRV_LIT("msg"),
+                .type = KSH_VALUE_TYPE_STR
             }
         }
-    },
-    .len = BUILTIN_CMDS_LEN
+    }
 };
+static CommandBuf commands = { .items = cmd_arr, .len = CMDS_LEN };
 
-#define BUILTIN_VARS_LEN 1
 static int variable_cursor = BUILTIN_VARS_LEN;
-static Variable variables[VARIABLES_LEN];
+static Variable variables[VARS_LEN];
 
 
 
@@ -57,6 +57,8 @@ void ksh_init(void)
 
 void ksh_deinit(void)
 {
+    for (int i = 0; i < VARS_LEN; i++)
+        free(variables[i].value.items);
 }
 
 KshErr ksh_parse(StrView sv, CommandCall *dest)
@@ -75,7 +77,7 @@ KshErr ksh_parse(StrView sv, CommandCall *dest)
 
 void ksh_add_command(Command cmd)
 {
-    assert(command_cursor+1 < COMMANDS_LEN);
+    assert(command_cursor+1 < CMDS_LEN);
     assert(cmd.name.items);
     assert(cmd.fn);
 
@@ -92,7 +94,7 @@ void ksh_add_command(Command cmd)
 
 void ksh_var_add(Variable var)
 {
-    assert(variable_cursor+1 < VARIABLES_LEN);
+    assert(variable_cursor+1 < VARS_LEN);
     assert(var.name.items);
     assert(var.value.items);
     variables[variable_cursor++] = var;
@@ -112,7 +114,7 @@ KshErr ksh_var_get_val(StrView name, StrView *dest)
 KshErr ksh_var_set_val(StrView name, StrView value)
 {
     Variable *var = find_var(name);
-    if (!var || !var->is_mutable) return KSH_ERR_VAR_NOT_FOUND;
+    if (!var) return KSH_ERR_VAR_NOT_FOUND;
 
     var->value.items = (char *) realloc(var->value.items, value.len);
     if (!var->value.items) return KSH_ERR_MEM_OVER;
@@ -127,7 +129,8 @@ KshErr ksh_var_set_val(StrView name, StrView value)
 
 static void init_builtin_variables(void)
 {
-    char user[10];
+    char *user = (char *) malloc(10);
+    assert(user);
     getlogin_r(user, 10);
     variables[0] = (Variable){
         .name = STRV_LIT("user"),
@@ -138,7 +141,7 @@ static void init_builtin_variables(void)
 
 static Variable *find_var(StrView name)
 {
-    for (int i = 0; i < VARIABLES_LEN; i++)
+    for (int i = 0; i < VARS_LEN; i++)
         if (strv_eq(name, variables[i].name))
             return &variables[i];
 

@@ -162,7 +162,6 @@ typedef struct {
         char  *items;
         size_t len;
     } value;
-    bool    is_mutable;
 } Variable;
 
 void ksh_init(void);
