@@ -154,7 +154,7 @@ bool ksh_lexer_next_token_if(Lexer *l, TokenType tt, Token *t);
 KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
 
 bool   ksh_token_type_fit_value_type(TokenType, KshValueTypeTag);
-KshErr ksh_token_parse_to_value(Token tok, KshValue *dest);
+KshErr ksh_token_parse_to_value(Token tok, KshValueType type, KshValue *dest);
 KshErr ksh_token_from_strv(StrView sv, Token *dest);
 KshErr ksh_token_type_to_value(TokenType t, KshValueTypeTag *dest);
 

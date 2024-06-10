@@ -286,10 +286,7 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
         }
 
         KshErr err;
-        if (!ksh_token_type_fit_value_type(arg_val.type, arg->value_type.tag))
-            return KSH_ERR_TYPE_EXPECTED;
-
-        err = ksh_token_parse_to_value(arg_val, &arg->value);
+        err = ksh_token_parse_to_value(arg_val, arg->value_type, &arg->value);
         if (err != KSH_ERR_OK) return err;
 
         err = ksh_val_parse(arg->value_type, &arg->value);

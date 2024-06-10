@@ -205,10 +205,7 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
 
 bool ksh_token_type_fit_value_type(TokenType tt, KshValueTypeTag val_t)
 {
-    if (val_t == KSH_VALUE_TYPE_TAG_ANY ||
-        tt == TOKEN_TYPE_VAR)
-        return true;
-
+    if (tt == TOKEN_TYPE_VAR) return true;
     for (size_t i = 0; i < STATIC_ARR_LEN(tok_to_val_type_map); i++)
         for (size_t j = 0; j < tok_to_val_type_map[i].tags_len; j++)
             if (tok_to_val_type_map[i].tags[j] == val_t)
@@ -217,8 +214,19 @@ bool ksh_token_type_fit_value_type(TokenType tt, KshValueTypeTag val_t)
     return false;
 }
 
-KshErr ksh_token_parse_to_value(Token tok, KshValue *dest)
+KshErr ksh_token_parse_to_value(Token tok, KshValueType type, KshValue *dest)
 {
+    if (type.tag == KSH_VALUE_TYPE_TAG_ANY) {
+        dest->as_str = tok.text;
+        return KSH_ERR_OK;
+    }
+
+    if (!ksh_token_type_fit_value_type(tok.type, type.tag))
+        return KSH_ERR_TYPE_EXPECTED;
+
+    StrView value;
+    Token token;
+    KshErr err;
     switch (tok.type) {
         case TOKEN_TYPE_LIT:
             dest->as_str = tok.text;
@@ -236,6 +244,15 @@ KshErr ksh_token_parse_to_value(Token tok, KshValue *dest)
         case TOKEN_TYPE_BOOL:
             dest->as_bool = tok.text.items[0] == 't' ? 1 : 0;
             break;
+        case TOKEN_TYPE_VAR:
+            err = ksh_var_get_val((StrView){
+                .items = &tok.text.items[1],
+                .len = tok.text.len-1
+            }, &value);
+            if (err != KSH_ERR_OK) return err;
+            err = ksh_token_from_strv(value, &token);
+            if (err != KSH_ERR_OK) return err;
+            return ksh_token_parse_to_value(token, type, dest);
         default: return KSH_ERR_TYPE_EXPECTED;
     }
 
