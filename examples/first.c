@@ -15,26 +15,21 @@ int main(void)
 
     ksh_init();
 
-    ksh_add_command((Command){
-        .name = STRV_LIT("some"),
-        .fn = some
-    });
-
-    prompt = (StrView)STRV_LIT("set da hello");
+    prompt = (StrView)STRV_LIT("enum second");
     err = ksh_parse(prompt, &cmd_call);
     if (err != KSH_ERR_OK) {
         puts("ERROR");
         return err;
     }
-    ksh_cmd_call_exec(cmd_call);
+    ksh_cmd_call_execute(cmd_call);
 
-    prompt = (StrView)STRV_LIT("print @da");
+    prompt = (StrView)STRV_LIT("print hello");
     err = ksh_parse(prompt, &cmd_call);
     if (err != KSH_ERR_OK) {
         puts("ERROR");
         return err;
     }
-    ksh_cmd_call_exec(cmd_call);
+    ksh_cmd_call_execute(cmd_call);
 
     ksh_deinit();
 }

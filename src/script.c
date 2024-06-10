@@ -94,14 +94,36 @@ static const struct TokenParser {
 //     args_eval_fn,
 // };
 
-static const KshValueType tok_to_val_type_map[] = {
-    [TOKEN_TYPE_STRING] = KSH_VALUE_TYPE_STR,
-    [TOKEN_TYPE_LIT]    = KSH_VALUE_TYPE_STR,
-    [TOKEN_TYPE_NUMBER] = KSH_VALUE_TYPE_INT,
-    [TOKEN_TYPE_BOOL]   = KSH_VALUE_TYPE_BOOL,
+static const struct {
+    KshValueTypeTag *tags;
+    size_t tags_len;
+} tok_to_val_type_map[] = {
+    {
+        .tags = (KshValueTypeTag[]){
+            KSH_VALUE_TYPE_TAG_STR 
+        },
+        .tags_len = 1
+    },
+    {   
+        .tags = (KshValueTypeTag[]){
+            KSH_VALUE_TYPE_TAG_STR,
+            KSH_VALUE_TYPE_TAG_ENUM 
+        },
+        .tags_len = 2
+    },
+    {
+        .tags = (KshValueTypeTag[]){
+            KSH_VALUE_TYPE_TAG_INT 
+        },
+        .tags_len = 1
+    },
+    {
+        .tags = (KshValueTypeTag[]){
+            KSH_VALUE_TYPE_TAG_BOOL
+        },
+        .tags_len = 1,
+    },
 };
-
-
 
 const char *ksh_lexer_token_type_to_string(TokenType tt)
 {
@@ -181,19 +203,22 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
     return KSH_ERR_OK;
 }
 
-KshErr ksh_token_parse_to_value(Token tok, KshValueType type, KshValue *dest)
+bool ksh_token_type_fit_value_type(TokenType tt, KshValueTypeTag val_t)
 {
-    if (type == KSH_VALUE_TYPE_ANY) {
-        dest->as_str = tok.text;
-        return KSH_ERR_OK;
-    }
+    if (val_t == KSH_VALUE_TYPE_TAG_ANY ||
+        tt == TOKEN_TYPE_VAR)
+        return true;
 
-    if (tok.type != TOKEN_TYPE_VAR)
-        if (tok.type >= STATIC_ARR_LEN(tok_to_val_type_map) ||
-            tok_to_val_type_map[tok.type] != type)
-            return KSH_ERR_TYPE_EXPECTED;
+    for (size_t i = 0; i < STATIC_ARR_LEN(tok_to_val_type_map); i++)
+        for (size_t j = 0; j < tok_to_val_type_map[i].tags_len; j++)
+            if (tok_to_val_type_map[i].tags[j] == val_t)
+                return true;
 
-    KshErr err;
+    return false;
+}
+
+KshErr ksh_token_parse_to_value(Token tok, KshValue *dest)
+{
     switch (tok.type) {
         case TOKEN_TYPE_LIT:
             dest->as_str = tok.text;
@@ -210,19 +235,6 @@ KshErr ksh_token_parse_to_value(Token tok, KshValueType type, KshValue *dest)
             break;
         case TOKEN_TYPE_BOOL:
             dest->as_bool = tok.text.items[0] == 't' ? 1 : 0;
-            break;
-        case TOKEN_TYPE_VAR:;
-            StrView value;
-            Token token;
-            err = ksh_var_get_val((StrView){
-                .items = &tok.text.items[1],
-                .len = tok.text.len-1
-            }, &value);
-            if (err != KSH_ERR_OK) return err;
-            err = ksh_token_from_strv(value, &token);
-            if (err != KSH_ERR_OK) return err;
-            err = ksh_token_parse_to_value(token, type, dest);
-            if (err != KSH_ERR_OK) return err;
             break;
         default: return KSH_ERR_TYPE_EXPECTED;
     }
@@ -247,13 +259,13 @@ KshErr ksh_token_from_strv(StrView sv, Token *dest)
     return KSH_ERR_PATTERN_NOT_FOUND;
 }
 
-KshErr ksh_token_type_to_value(TokenType t, KshValueType *dest)
-{
-    if (t >= STATIC_ARR_LEN(tok_to_val_type_map))
-        return KSH_ERR_TYPE_EXPECTED;
-    *dest = tok_to_val_type_map[t];
-    return KSH_ERR_OK;
-}
+// KshErr ksh_token_type_to_value(TokenType t, KshValueType *dest)
+// {
+//     if (t >= STATIC_ARR_LEN(tok_to_val_type_map))
+//         return KSH_ERR_TYPE_EXPECTED;
+//     *dest = tok_to_val_type_map[t];
+//     return KSH_ERR_OK;
+// }
 
 // KshErr ksh_parse(Lexer *lex, Terminal *term)
 // {
@@ -387,7 +399,6 @@ static bool is_lit(int letter)
            || ('A' <= letter && letter <= 'Z')
            || ('0' <= letter && letter <= '9');
 }
-
 // static KshErr cmd_eval_fn(Lexer *l, Terminal *term, bool *exit)
 // {
 //     Token tok;

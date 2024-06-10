@@ -26,40 +26,65 @@ static Variable *find_usr_var(StrView name);
 static KshErr cmd_eval(Lexer *lex, CommandCall *cmd_call);
 static KshErr args_eval(Lexer *lex, CommandCall *cmd_call);
 
-static int builtin_print(KshValue *args);
-static int builtin_set_var(KshValue *args);
+static int builtin_print(Arg *args);
+static int builtin_set_var(Arg *args);
+static int builtin_enum_test(Arg *args);
 
 static int command_cursor = BUILTIN_CMDS_LEN;
 static Command cmd_arr[CMDS_LEN] = {
     {
         .name = STRV_LIT("print"),
         .desc = "Prints a message",
-        .fn = builtin_print,
-        .arg_defs_len = 1,
-        .arg_defs = (ArgDef[]){
+        .call.fn = builtin_print,
+        .call.args_len = 1,
+        .call.args = (Arg[]){
             {
                 .name = STRV_LIT("msg"),
-                .type = KSH_VALUE_TYPE_STR
+                .usage = "A message to print",
+                .value_type.tag = KSH_VALUE_TYPE_TAG_STR,
             }
         }
     },
     {
         .name = STRV_LIT("set"),
-        .desc = "Set a variable new value or create new",
-        .fn = builtin_set_var,
-        .arg_defs_len = 2,
-        .arg_defs = (ArgDef[]){
+        .desc = "Sets a variable or creates new",
+        .call.fn = builtin_set_var,
+        .call.args_len = 2,
+        .call.args = (Arg[]){
             {
                 .name = STRV_LIT("name"),
-                .type = KSH_VALUE_TYPE_STR,
+                .usage = "Name",
+                .value_type.tag = KSH_VALUE_TYPE_TAG_STR,
             },
             {
                 .name = STRV_LIT("value"),
-                .type = KSH_VALUE_TYPE_STR
+                .usage =  "Value",
+                .value_type.tag = KSH_VALUE_TYPE_TAG_ANY
+            }
+        }
+    },
+    {
+        .name = STRV_LIT("enum"),
+        .desc = "Enum test",
+        .call.fn = builtin_enum_test,
+        .call.args_len = 1,
+        .call.args = (Arg[]){
+            {
+                .name = STRV_LIT("enum"),
+                .value_type.tag = KSH_VALUE_TYPE_TAG_ENUM,
+                .value_type.info = &(KshValueTypeEnum){
+                    .cases = (StrView[]){
+                        STRV_LIT("first"),
+                        STRV_LIT("second"),
+                        STRV_LIT("third")
+                    },
+                    .cases_len = 3
+                }
             }
         }
     }
 };
+
 static CommandBuf commands = { .items = cmd_arr, .len = CMDS_LEN };
 
 static int variable_cursor = BUILTIN_VARS_LEN;
@@ -85,7 +110,6 @@ KshErr ksh_parse(StrView sv, CommandCall *dest)
 
     err = cmd_eval(&lex, dest);
     if (err != KSH_ERR_OK) return err;
-
     err = args_eval(&lex, dest);
     if (err != KSH_ERR_OK) return err;
 
@@ -96,12 +120,12 @@ void ksh_add_command(Command cmd)
 {
     assert(command_cursor+1 < CMDS_LEN);
     assert(cmd.name.items);
-    assert(cmd.fn);
+    assert(cmd.call.fn);
 
-    for (size_t i = 0; i < cmd.arg_defs_len; i++) {
-        assert(cmd.arg_defs[i].name.items);
-        if (!cmd.arg_defs[i].usage)
-            cmd.arg_defs[i].usage = "none";
+    for (size_t i = 0; i < cmd.call.args_len; i++) {
+        assert(cmd.call.args[i].name.items);
+        if (!cmd.call.args[i].usage)
+            cmd.call.args[i].usage = "none";
     }
 
     if (!cmd.desc) cmd.desc = "none";
@@ -201,7 +225,7 @@ static KshErr cmd_eval(Lexer *l, CommandCall *cmd_call)
         return KSH_ERR_COMMAND_NOT_FOUND;
     }
 
-    *cmd_call = ksh_cmd_create_call(cmd);
+    *cmd_call = cmd->call;
 
     return KSH_ERR_OK;
 }
@@ -209,7 +233,7 @@ static KshErr cmd_eval(Lexer *l, CommandCall *cmd_call)
 static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
 {
     (void) exit;
-    assert(cmd_call->cmd);
+    assert(cmd_call->fn);
 
     Arg *arg;
     Token arg_name;
@@ -221,17 +245,15 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
             ksh_lexer_next_token_if(lex, TOKEN_TYPE_EQ, &arg_val) &&
             ksh_lexer_next_token(lex, &arg_val))
         {
-            arg = ksh_args_find(cmd_call->argc,
-                                cmd_call->argv,
-                                arg_name.text);
-            cmd_call->last_assigned_arg_idx = arg - cmd_call->argv + 1;
+            arg = ksh_cmd_call_find_arg(*cmd_call, arg_name.text);
+            cmd_call->last_assigned_arg_idx = arg - cmd_call->args + 1;
         } else {
-            if (cmd_call->last_assigned_arg_idx >= cmd_call->argc) {
+            if (cmd_call->last_assigned_arg_idx >= cmd_call->args_len) {
                 KSH_LOG_ERR("last arg not found%s", "");
                 return KSH_ERR_ARG_NOT_FOUND;
             }
             arg_val = arg_name;
-            arg = &cmd_call->argv[cmd_call->last_assigned_arg_idx++];
+            arg = &cmd_call->args[cmd_call->last_assigned_arg_idx++];
         }
 
         if (arg == NULL) {
@@ -239,36 +261,45 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
             return KSH_ERR_ARG_NOT_FOUND;
         }
 
-        KshErr err = ksh_token_parse_to_value(arg_val, arg->def->type, &arg->value);
-        if (err != KSH_ERR_OK) {
-            if (err == KSH_ERR_TYPE_EXPECTED) {
-                KSH_LOG_ERR("arg `"STRV_FMT"`: expected type: <%s>",
-                            STRV_ARG(arg->def->name),
-                            ksh_val_type_str(arg->def->type));
-            }
-            return err;
-        }
-        arg->is_assign = true;
+        KshErr err;
+        if (!ksh_token_type_fit_value_type(arg_val.type, arg->value_type.tag))
+            return KSH_ERR_TYPE_EXPECTED;
+
+        err = ksh_token_parse_to_value(arg_val, &arg->value);
+        if (err != KSH_ERR_OK) return err;
+
+        err = ksh_val_parse(arg->value_type, &arg->value);
+        if (err != KSH_ERR_OK) return err;
+
+        arg->is_assigned = true;
     }
 
     return KSH_ERR_OK;
 }
 
-static int builtin_print(KshValue *args)
+static int builtin_print(Arg *args)
 {
-    printf(STRV_FMT"\n", STRV_ARG(args[0].as_str));
+    printf(STRV_FMT"\n", STRV_ARG(args[0].value.as_str));
     return 0;
 }
 
-static int builtin_set_var(KshValue *args)
+static int builtin_set_var(Arg *args)
 {
-    StrView name = args[0].as_str;
-    StrView value = args[1].as_str;
+    StrView name = args[0].value.as_str;
+    StrView value = args[1].value.as_str;
 
     KshErr err = ksh_var_set_val(name, value);
-    if (err == KSH_ERR_VAR_NOT_FOUND) {
+    if (err == KSH_ERR_VAR_NOT_FOUND)
         if (ksh_var_add(name, value) != KSH_ERR_OK)
             return 1;
 
+    return 0;
+}
+
+static int builtin_enum_test(Arg *args)
+{
+    if (args[0].value.as_int == 0) puts("0");
+    else if (args[0].value.as_int == 1) puts("1");
+    else if (args[0].value.as_int == 2) puts("2");
     return 0;
 }

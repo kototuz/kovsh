@@ -1,6 +1,16 @@
 #include "kovsh.h"
 #include <string.h>
+#include <stdlib.h>
 
+typedef KshErr (*KshParseFn)(void *type_info, KshValue *value);
+
+static KshErr parse_enum(KshValueTypeEnum *, KshValue *);
+// TODO:
+// static KshErr parse_array(StrView, KshArrayInfo *, KshValue *);
+
+static const KshParseFn parsers[] = {
+    [KSH_VALUE_TYPE_TAG_ENUM] = (KshParseFn) parse_enum
+};
 
 const char *ksh_err_str(KshErr err)
 {
@@ -30,12 +40,30 @@ bool strv_eq(StrView sv1, StrView sv2)
            (memcmp(sv1.items, sv2.items, sv1.len) == 0);
 }
 
-const char *ksh_val_type_str(KshValueType t)
+const char *ksh_val_type_tag_str(KshValueTypeTag t)
 {
     switch (t) {
-        case KSH_VALUE_TYPE_STR:  return "string";
-        case KSH_VALUE_TYPE_INT:  return "integer";
-        case KSH_VALUE_TYPE_BOOL: return "boolean";
+        case KSH_VALUE_TYPE_TAG_STR:  return "string";
+        case KSH_VALUE_TYPE_TAG_INT:  return "integer";
+        case KSH_VALUE_TYPE_TAG_BOOL: return "boolean";
         default: assert(0 && "unknown value type");
     }
+}
+
+KshErr ksh_val_parse(KshValueType type, KshValue *dest)
+{
+    if (type.info == NULL) return KSH_ERR_OK;
+    return parsers[type.tag](type.info, dest);
+}
+
+KshErr parse_enum(KshValueTypeEnum *info, KshValue *value)
+{
+    for (size_t i = 0; i < info->cases_len; i++)
+        if (strv_eq(value->as_str, info->cases[i])) {
+            *value = (KshValue){ .as_int = i };
+            return KSH_ERR_OK;
+        }
+
+    // TODO: add error type
+    return 1;
 }
