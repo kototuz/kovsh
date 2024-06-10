@@ -28,6 +28,7 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call);
 
 static int builtin_print(Arg *args);
 static int builtin_set_var(Arg *args);
+static int builtin_list_vars(Arg *args);
 static int builtin_enum_test(Arg *args);
 
 static int command_cursor = BUILTIN_CMDS_LEN;
@@ -46,20 +47,30 @@ static Command cmd_arr[CMDS_LEN] = {
         }
     },
     {
-        .name = STRV_LIT("set"),
-        .desc = "Sets a variable or creates new",
-        .call.fn = builtin_set_var,
-        .call.args_len = 2,
-        .call.args = (Arg[]){
-            {
-                .name = STRV_LIT("name"),
-                .usage = "Name",
-                .value_type.tag = KSH_VALUE_TYPE_TAG_STR,
-            },
-            {
-                .name = STRV_LIT("value"),
-                .usage =  "Value",
-                .value_type.tag = KSH_VALUE_TYPE_TAG_ANY
+        .name = STRV_LIT("var"),
+        .desc = "Lists variables",
+        .call.fn = builtin_list_vars,
+        .subcommands = {
+            .len = 1,
+            .items = (Command[]){
+                {
+                    .name = STRV_LIT("set"),
+                    .desc = "Sets or creates a variable",
+                    .call.fn = builtin_set_var,
+                    .call.args_len = 2,
+                    .call.args = (Arg[]){
+                        {
+                            .name = STRV_LIT("name"),
+                            .usage = "Variable name",
+                            .value_type.tag = KSH_VALUE_TYPE_TAG_STR,
+                        },
+                        {
+                            .name = STRV_LIT("value"),
+                            .usage = "Variable value",
+                            .value_type.tag = KSH_VALUE_TYPE_TAG_ANY
+                        }
+                    }
+                }
             }
         }
     },
@@ -216,6 +227,8 @@ static Variable *find_usr_var(StrView name)
 static KshErr cmd_eval(Lexer *l, CommandCall *cmd_call)
 {
     Token tok;
+    Command *subcmd;
+
     KshErr err = ksh_lexer_expect_next_token(l, TOKEN_TYPE_LIT, &tok);
     if (err != KSH_ERR_OK) return err;
 
@@ -224,6 +237,17 @@ static KshErr cmd_eval(Lexer *l, CommandCall *cmd_call)
         KSH_LOG_ERR("command not found: `"STRV_FMT"`", STRV_ARG(tok.text));
         return KSH_ERR_COMMAND_NOT_FOUND;
     }
+
+    if (cmd->subcommands.len > 0) 
+        while (ksh_lexer_peek_token(l, &tok) &&
+               tok.type == TOKEN_TYPE_LIT) {
+            subcmd = ksh_cmd_find(cmd->subcommands, tok.text);
+            if (!subcmd) break;
+
+            ksh_lexer_next_token(l, &tok);
+            cmd = subcmd;
+        }
+
 
     *cmd_call = cmd->call;
 
@@ -280,6 +304,17 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
 static int builtin_print(Arg *args)
 {
     printf(STRV_FMT"\n", STRV_ARG(args[0].value.as_str));
+    return 0;
+}
+
+static int builtin_list_vars(Arg *args)
+{
+    (void) args;
+    for (size_t i = 0; i < VARS_LEN; i++) {
+        if (!variables[i].name.items) break;
+        printf(STRV_FMT"\n", STRV_ARG(variables[i].name));
+    }
+
     return 0;
 }
 

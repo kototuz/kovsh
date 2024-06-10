@@ -89,16 +89,20 @@ typedef struct {
     size_t last_assigned_arg_idx;
 } CommandCall;
 
-typedef struct {
-    StrView name;
-    const char *desc;
-    CommandCall call;
-} Command;
+typedef struct Command Command;
 
 typedef struct {
     Command *items;
     size_t len;
 } CommandBuf;
+
+struct Command {
+    StrView name;
+    const char *desc;
+    CommandCall call;
+    CommandBuf subcommands;
+};
+
 
 void ksh_cmd_print(Command cmd);
 Command *ksh_cmd_find_local(CommandBuf buf, StrView sv);
