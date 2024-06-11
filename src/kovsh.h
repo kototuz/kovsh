@@ -73,30 +73,28 @@ KshErr      ksh_val_parse(KshValueType type, KshValue *value);
 //////////////////////////////////////////////
 
 typedef struct {
-    KshValue value;
+    KshValue data;
     bool is_assigned;
-} ArgData;
+} ArgValue;
 
 typedef struct {
     StrView name;
     const char *usage;
-    bool has_default;
-    KshValue default_value;
     KshValueType value_type;
+    ArgValue value;
 } Arg;
 
 typedef struct {
-    Arg *arg_def;
-    KshValue data;
-    bool is_assigned;
-} CommandCallValue;
+    Arg *arg_ptr;
+    ArgValue value;
+} ArgValueCopy;
 
-typedef int (*CommandFn)(CommandCallValue *values);
+typedef int (*CommandFn)(ArgValueCopy *args);
 
 typedef struct {
     CommandFn fn;
-    CommandCallValue *values;
-    size_t values_len;
+    ArgValueCopy *args;
+    size_t args_len;
     size_t last_assigned_idx;
 } CommandCall;
 
@@ -125,7 +123,7 @@ KshErr ksh_cmd_init_call(Command *cmd, CommandCall *call);
 KshErr ksh_cmd_get(CommandBuf buf, StrView sv, Command *out);
 
 KshErr ksh_cmd_call_execute(CommandCall);
-CommandCallValue *ksh_cmd_call_find_value(CommandCall *call, StrView name);
+ArgValueCopy *ksh_cmd_call_find_value(CommandCall *call, StrView name);
 
 void ksh_arg_print(Arg);
 

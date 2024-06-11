@@ -26,7 +26,7 @@ static Variable *find_usr_var(StrView name);
 static KshErr cmd_eval(Lexer *lex, CommandCall *cmd_call);
 static KshErr args_eval(Lexer *lex, CommandCall *cmd_call);
 
-static int builtin_print(CommandCallValue *values);
+static int builtin_print(ArgValueCopy *args);
 static int builtin_set_var(Arg *args);
 static int builtin_list_vars(Arg *args);
 static int builtin_enum_test(Arg *args);
@@ -258,7 +258,7 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
     (void) exit;
     assert(cmd_call->fn);
 
-    CommandCallValue *value;
+    ArgValueCopy *arg;
     Token arg_name;
     Token arg_val;
     while (ksh_lexer_peek_token(lex, &arg_name) &&
@@ -268,39 +268,39 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
             ksh_lexer_next_token_if(lex, TOKEN_TYPE_EQ, &arg_val) &&
             ksh_lexer_next_token(lex, &arg_val))
         {
-            value = ksh_cmd_call_find_value(cmd_call, arg_name.text);
+            arg = ksh_cmd_call_find_value(cmd_call, arg_name.text);
             cmd_call->last_assigned_idx = 
-                &cmd_call->values[cmd_call->last_assigned_idx] - cmd_call->values + 1;
+                &cmd_call->args[cmd_call->last_assigned_idx] - cmd_call->args + 1;
         } else {
-            if (cmd_call->last_assigned_idx >= cmd_call->values_len) {
+            if (cmd_call->last_assigned_idx >= cmd_call->args_len) {
                 KSH_LOG_ERR("last arg not found%s", "");
                 return KSH_ERR_ARG_NOT_FOUND;
             }
             arg_val = arg_name;
-            value = &cmd_call->values[cmd_call->last_assigned_idx++];
+            arg = &cmd_call->args[cmd_call->last_assigned_idx++];
         }
 
-        if (value == NULL) {
+        if (arg == NULL) {
             KSH_LOG_ERR("arg not found: `"STRV_FMT"`", STRV_ARG(arg_name.text));
             return KSH_ERR_ARG_NOT_FOUND;
         }
 
         KshErr err;
-        err = ksh_token_parse_to_value(arg_val, value->arg_def->value_type, &value->data);
+        err = ksh_token_parse_to_value(arg_val, arg->arg_ptr->value_type, &arg->value.data);
         if (err != KSH_ERR_OK) return err;
 
-        err = ksh_val_parse(value->arg_def->value_type, &value->data);
+        err = ksh_val_parse(arg->arg_ptr->value_type, &arg->value.data);
         if (err != KSH_ERR_OK) return err;
 
-        value->is_assigned = true;
+        arg->value.is_assigned = true;
     }
 
     return KSH_ERR_OK;
 }
 
-static int builtin_print(CommandCallValue *values)
+static int builtin_print(ArgValueCopy *args)
 {
-    printf(STRV_FMT"\n", STRV_ARG(values[0].data.as_str));
+    printf(STRV_FMT"\n", STRV_ARG(args[0].value.data.as_str));
     return 0;
 }
 // 

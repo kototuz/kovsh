@@ -3,10 +3,10 @@
 #include <assert.h>
 #include <stdlib.h>
 
-static KshErr check_assignment(CommandCallValue *values, size_t len)
+static KshErr check_assignment(ArgValueCopy *args, size_t len)
 {
     for (size_t i = 0; i < len; i++) {
-        if (!values[i].is_assigned) {
+        if (!args[i].value.is_assigned) {
             return KSH_ERR_ASSIGNMENT_EXPECTED;
         }
     }
@@ -44,20 +44,16 @@ Command *ksh_cmd_find(CommandBuf buf, StrView sv)
 KshErr ksh_cmd_init_call(Command *self, CommandCall *call)
 {
     *call = (CommandCall){
-        .values = (CommandCallValue *) malloc(sizeof(CommandCallValue) * self->args_len),
-        .values_len = self->args_len,
+        .args = (ArgValueCopy *) malloc(sizeof(ArgValueCopy) * self->args_len),
+        .args_len = self->args_len,
         .fn = self->fn,
     };
 
-    if (!call->values) return KSH_ERR_MEM_OVER;
+    if (!call->args) return KSH_ERR_MEM_OVER;
 
     for (size_t i = 0; i < self->args_len; i++) {
-        call->values[i].arg_def = &self->args[i];
-        call->values[i].is_assigned = self->args[i].has_default;
-        if (self->args[i].has_default) {
-            call->values[i].data = self->args[i].default_value;
-            call->values[i].is_assigned = true;
-        }
+        call->args[i].value = self->args[i].value;
+        call->args[i].arg_ptr = &self->args[i];
     }
 
     return KSH_ERR_OK;
@@ -65,19 +61,19 @@ KshErr ksh_cmd_init_call(Command *self, CommandCall *call)
 
 KshErr ksh_cmd_call_execute(CommandCall cmd_call)
 {
-    KshErr err = check_assignment(cmd_call.values, cmd_call.values_len);
+    KshErr err = check_assignment(cmd_call.args, cmd_call.args_len);
     if (err != KSH_ERR_OK) return err;
 
-    cmd_call.fn(cmd_call.values);
+    cmd_call.fn(cmd_call.args);
 
     return KSH_ERR_OK;
 }
 
-CommandCallValue *ksh_cmd_call_find_value(CommandCall *self, StrView name)
+ArgValueCopy *ksh_cmd_call_find_value(CommandCall *self, StrView name)
 {
-    for (size_t i = 0; i < self->values_len; i++) {
-        if (strv_eq(name, self->values[i].arg_def->name)) {
-            return &self->values[i];
+    for (size_t i = 0; i < self->args_len; i++) {
+        if (strv_eq(name, self->args[i].arg_ptr->name)) {
+            return &self->args[i];
         }
     }
 
