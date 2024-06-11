@@ -19,6 +19,10 @@ int main(void)
 
     ksh_init();
 
+    err = ksh_var_add((StrView)STRV_LIT("fish"),
+                      (StrView)STRV_LIT("animal"));
+    if (err != KSH_ERR_OK) return err;
+
     for (;;) {
         printf(">>> ");
         getline(&text, &prompt.len, stdin);
@@ -29,7 +33,11 @@ int main(void)
             puts("ERROR");
             return err;
         }
-        ksh_cmd_call_execute(cmd_call);
+        err = ksh_cmd_call_execute(cmd_call);
+        if (err != KSH_ERR_OK) {
+            puts("ERROR");
+            return err;
+        }
     }
 
     free(text);

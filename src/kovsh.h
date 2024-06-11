@@ -73,20 +73,31 @@ KshErr      ksh_val_parse(KshValueType type, KshValue *value);
 //////////////////////////////////////////////
 
 typedef struct {
-    StrView name;
     KshValue value;
-    KshValueType value_type;
-    const char *usage;
     bool is_assigned;
+} ArgData;
+
+typedef struct {
+    StrView name;
+    const char *usage;
+    bool has_default;
+    KshValue default_value;
+    KshValueType value_type;
 } Arg;
 
-typedef int (*CommandFn)(Arg *args);
+typedef struct {
+    Arg *arg_def;
+    KshValue data;
+    bool is_assigned;
+} CommandCallValue;
+
+typedef int (*CommandFn)(CommandCallValue *values);
 
 typedef struct {
     CommandFn fn;
-    Arg *args;
-    size_t args_len;
-    size_t last_assigned_arg_idx;
+    CommandCallValue *values;
+    size_t values_len;
+    size_t last_assigned_idx;
 } CommandCall;
 
 typedef struct Command Command;
@@ -97,9 +108,11 @@ typedef struct {
 } CommandBuf;
 
 struct Command {
+    CommandFn fn;
     StrView name;
     const char *desc;
-    CommandCall call;
+    Arg *args;
+    size_t args_len;
     CommandBuf subcommands;
 };
 
@@ -108,10 +121,11 @@ void ksh_cmd_print(Command cmd);
 Command *ksh_cmd_find_local(CommandBuf buf, StrView sv);
 Command *ksh_cmd_find_hardcoded(StrView sv);
 Command *ksh_cmd_find(CommandBuf buf, StrView sv);
+KshErr ksh_cmd_init_call(Command *cmd, CommandCall *call);
 KshErr ksh_cmd_get(CommandBuf buf, StrView sv, Command *out);
 
 KshErr ksh_cmd_call_execute(CommandCall);
-Arg *ksh_cmd_call_find_arg(CommandCall call, StrView name);
+CommandCallValue *ksh_cmd_call_find_value(CommandCall *call, StrView name);
 
 void ksh_arg_print(Arg);
 
