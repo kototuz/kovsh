@@ -27,7 +27,8 @@ typedef enum {
     KSH_ERR_ASSIGNMENT_EXPECTED,
     KSH_ERR_MEM_OVER,
     KSH_ERR_PATTERN_NOT_FOUND,
-    KSH_ERR_VAR_NOT_FOUND
+    KSH_ERR_VAR_NOT_FOUND,
+    KSH_ERR_NAME_ALREADY_EXISTS
 } KshErr;
 
 typedef struct {
@@ -194,6 +195,7 @@ void ksh_deinit(void);
 KshErr ksh_parse(StrView, CommandCall *dest);
 
 void ksh_use_command_set(CommandSet);
+void ksh_use_builtin_commands(void);
 void ksh_use_variable_set(VariableSet);
 
 KshErr ksh_var_add(const StrView name, const StrView value);

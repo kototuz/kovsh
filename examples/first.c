@@ -2,13 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-static int some(KshValue *args)
-{
-    (void) args;
-    puts("Hello");
-    return 0;
-}
-
 // A SIMPLE CONSOLE
 int main(void)
 {
@@ -17,11 +10,9 @@ int main(void)
     KshErr err;
     char *text;
 
-    ksh_init();
+    ksh_use_builtin_commands();
 
-    err = ksh_var_add((StrView)STRV_LIT("fish"),
-                      (StrView)STRV_LIT("animal"));
-    if (err != KSH_ERR_OK) return err;
+    ksh_init();
 
     for (;;) {
         printf(">>> ");
@@ -30,12 +21,12 @@ int main(void)
         prompt.items = text;
         err = ksh_parse(prompt, &cmd_call);
         if (err != KSH_ERR_OK) {
-            puts("ERROR");
+            printf("ERROR: %d\n", err);
             return err;
         }
         err = ksh_cmd_call_execute(cmd_call);
         if (err != KSH_ERR_OK) {
-            puts("ERROR");
+            printf("ERROR: %d\n", err);
             return err;
         }
     }
