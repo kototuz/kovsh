@@ -4,20 +4,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define BUILTIN_VARS_LEN 1
-#define BUILTIN_CMDS_LEN 2
-
-#ifndef USR_CMDS_LEN
-#   define USR_CMDS_LEN 128
-#endif
-
-#ifndef USR_VARS_LEN
-#   define USR_VARS_LEN 128
-#endif
-
-#define CMDS_LEN (BUILTIN_CMDS_LEN + USR_CMDS_LEN)
-#define VARS_LEN (BUILTIN_VARS_LEN + USR_VARS_LEN)
-
 static void init_builtin_variables(void);
 
 static Variable *find_var(StrView name);
@@ -30,23 +16,6 @@ static int builtin_print(ArgValueCopy *args);
 static int builtin_set_var(Arg *args);
 static int builtin_list_vars(Arg *args);
 static int builtin_enum_test(Arg *args);
-
-static int command_cursor = BUILTIN_CMDS_LEN;
-static Command cmd_arr[CMDS_LEN] = {
-     {
-         .name = STRV_LIT("print"),
-         .desc = "Prints a message",
-         .fn = builtin_print,
-         .args_len = 1,
-         .args = (Arg[]){
-             {
-                 .name = STRV_LIT("msg"),
-                 .usage = "A message to print",
-                 .value_type.tag = KSH_VALUE_TYPE_TAG_STR,
-             }
-         }
-     }
-};
 //     {
 //         .name = STRV_LIT("var"),
 //         .desc = "Lists variables",
@@ -97,22 +66,19 @@ static Command cmd_arr[CMDS_LEN] = {
 //     }
 // };
 
-static CommandBuf commands = { .items = cmd_arr, .len = CMDS_LEN };
-
-static int variable_cursor = BUILTIN_VARS_LEN;
-static Variable variables[VARS_LEN];
+static CommandSet commands = {0};
+static VariableSet variables = {0};
 
 
 
 void ksh_init(void)
 {
-    init_builtin_variables();
 }
 
 void ksh_deinit(void)
 {
-    for (int i = 0; i < VARS_LEN; i++)
-        free(variables[i].value.items);
+    for (size_t i = 0; i < variables.len; i++)
+        free(variables.items[i].value.items);
 }
 
 KshErr ksh_parse(StrView sv, CommandCall *dest)
@@ -127,44 +93,14 @@ KshErr ksh_parse(StrView sv, CommandCall *dest)
     return KSH_ERR_OK;
 }
 
-void ksh_add_command(Command cmd)
+void ksh_use_command_set(CommandSet set)
 {
-    assert(command_cursor+1 < CMDS_LEN);
-    assert(cmd.name.items);
-    assert(cmd.fn);
-
-    for (size_t i = 0; i < cmd.args_len; i++) {
-        assert(cmd.args[i].name.items);
-        if (!cmd.args[i].usage)
-            cmd.args[i].usage = "none";
-    }
-
-    if (!cmd.desc) cmd.desc = "none";
-
-    commands.items[command_cursor++] = cmd;
+    commands = set;
 }
 
-KshErr ksh_var_add(const StrView name, const StrView value)
+void ksh_use_variable_set(VariableSet set)
 {
-    assert(variable_cursor+1 < VARS_LEN);
-    assert(name.items);
-    assert(value.items);
-
-    char *name_buf = (char *) malloc(name.len);
-    char *value_buf = (char *) malloc(value.len);
-    if (!name_buf || !value_buf) return KSH_ERR_MEM_OVER;
-
-    memcpy(name_buf, name.items, name.len);
-    memcpy(value_buf, value.items, value.len);
-
-    variables[variable_cursor++] = (Variable){
-        .name.items = name_buf,
-        .name.len = name.len,
-        .value.items = value_buf,
-        .value.len = value.len
-    };
-
-    return KSH_ERR_OK;
+    variables = set;
 }
 
 KshErr ksh_var_get_val(StrView name, StrView *dest)
@@ -194,32 +130,20 @@ KshErr ksh_var_set_val(StrView name, StrView value)
 
 
 
-static void init_builtin_variables(void)
-{
-    char *user = (char *) malloc(10);
-    assert(user);
-    getlogin_r(user, 10);
-    variables[0] = (Variable){
-        .name = STRV_LIT("user"),
-        .value.items = user,
-        .value.len = strlen(user)
-    };
-}
-
 static Variable *find_var(StrView name)
 {
-    for (int i = 0; i < VARS_LEN; i++)
-        if (strv_eq(name, variables[i].name))
-            return &variables[i];
+    for (size_t i = 0; i < variables.len; i++)
+        if (strv_eq(name, variables.items[i].name))
+            return &variables.items[i];
 
     return NULL;
 }
 
 static Variable *find_usr_var(StrView name)
 {
-    for (int i = BUILTIN_VARS_LEN; i < VARS_LEN; i++)
-        if (strv_eq(name, variables[i].name))
-            return &variables[i];
+    for (size_t i = 0; i < variables.len; i++)
+        if (strv_eq(name, variables.items[i].name))
+            return &variables.items[i];
 
     return NULL;
 }

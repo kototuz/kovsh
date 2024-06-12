@@ -30,7 +30,7 @@ void ksh_cmd_print(Command cmd)
     }
 }
 
-Command *ksh_cmd_find(CommandBuf buf, StrView sv)
+Command *ksh_cmd_find(CommandSet buf, StrView sv)
 {
     for (size_t i = 0; i < buf.len; i++) {
         if (strv_eq(sv, buf.items[i].name)) {

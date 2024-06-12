@@ -103,7 +103,7 @@ typedef struct Command Command;
 typedef struct {
     Command *items;
     size_t len;
-} CommandBuf;
+} CommandSet;
 
 struct Command {
     CommandFn fn;
@@ -111,16 +111,16 @@ struct Command {
     const char *desc;
     Arg *args;
     size_t args_len;
-    CommandBuf subcommands;
+    CommandSet subcommands;
 };
 
 
 void ksh_cmd_print(Command cmd);
-Command *ksh_cmd_find_local(CommandBuf buf, StrView sv);
+Command *ksh_cmd_find_local(CommandSet set, StrView sv);
 Command *ksh_cmd_find_hardcoded(StrView sv);
-Command *ksh_cmd_find(CommandBuf buf, StrView sv);
+Command *ksh_cmd_find(CommandSet set, StrView sv);
 KshErr ksh_cmd_init_call(Command *cmd, CommandCall *call);
-KshErr ksh_cmd_get(CommandBuf buf, StrView sv, Command *out);
+KshErr ksh_cmd_get(CommandSet set, StrView sv, Command *out);
 
 KshErr ksh_cmd_call_execute(CommandCall);
 ArgValueCopy *ksh_cmd_call_find_value(CommandCall *call, StrView name);
@@ -182,16 +182,20 @@ typedef struct {
     } value;
 } Variable;
 
+typedef struct {
+    Variable *items;
+    size_t len;
+} VariableSet;
+
 void ksh_init(void);
 void ksh_deinit(void);
 
 KshErr ksh_parse(StrView, CommandCall *dest);
 
-void ksh_add_command(Command);
+void ksh_use_command_set(CommandSet);
+void ksh_use_variable_set(VariableSet);
 
 KshErr ksh_var_add(const StrView name, const StrView value);
 KshErr ksh_var_get_val(StrView name, StrView *dest);
-KshErr ksh_var_set_val(StrView name, StrView value);
-
 
 #endif
