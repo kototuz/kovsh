@@ -194,6 +194,27 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
     return KSH_ERR_OK;
 }
 
+KshErr ksh_token_get_actual_data(Token tok, StrView *dest)
+{
+    KshErr err;
+    switch (tok.type) {
+        case TOKEN_TYPE_STRING:
+            dest->items = &tok.text.items[1];
+            dest->len = tok.text.len-2;
+            break;
+        case TOKEN_TYPE_VAR:
+            err = ksh_var_get_val((StrView){
+                .items = &tok.text.items[1],
+                .len = tok.text.len-1
+            }, dest);
+            if (err != KSH_ERR_OK) return err;
+            break;
+        default: *dest = tok.text;
+    }
+
+    return KSH_ERR_OK;
+}
+
 bool ksh_token_type_fit_value_type(TokenType tt, KshValueTypeTag val_t)
 {
     if (tt == TOKEN_TYPE_VAR) return true;
