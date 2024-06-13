@@ -40,12 +40,12 @@ static CommandSet builtin_commands = {
                         {
                             .name = STRV_LIT("name"),
                             .usage = "Variable name",
-                            .value_type.tag = KSH_VALUE_TYPE_TAG_STR
+                            .type_inst.type_tag = KSH_VALUE_TYPE_TAG_STR
                         },
                         {
                             .name = STRV_LIT("value"),
                             .usage = "Variable value",
-                            .value_type.tag = KSH_VALUE_TYPE_TAG_STR
+                            .type_inst.type_tag = KSH_VALUE_TYPE_TAG_STR
                         }
                     }
                 }
@@ -60,7 +60,7 @@ static CommandSet builtin_commands = {
                 {
                     .name = STRV_LIT("msg"),
                     .usage = "Message to print",
-                    .value_type.tag = KSH_VALUE_TYPE_TAG_STR
+                    .type_inst.type_tag = KSH_VALUE_TYPE_TAG_STR
                 }
             }
         }
@@ -227,6 +227,7 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
     (void) exit;
     assert(cmd_call->fn);
 
+    KshErr err;
     ArgValueCopy *arg;
     Token arg_name;
     Token arg_val;
@@ -254,11 +255,13 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
             return KSH_ERR_ARG_NOT_FOUND;
         }
 
-        KshErr err;
-        err = ksh_token_parse_to_value(arg_val, arg->arg_ptr->value_type, &arg->value.data);
+        err = ksh_token_actual(&arg_val);
         if (err != KSH_ERR_OK) return err;
 
-        err = ksh_val_parse(arg->arg_ptr->value_type, &arg->value.data);
+        if (!ksh_val_type_eq_ttype(arg->arg_ptr->type_inst.type_tag, arg_val.type))
+            return KSH_ERR_TYPE_EXPECTED;
+
+        err = ksh_val_parse(arg_val.text, arg->arg_ptr->type_inst, &arg->value.data);
         if (err != KSH_ERR_OK) return err;
 
         arg->value.is_assigned = true;

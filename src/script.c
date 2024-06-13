@@ -194,6 +194,30 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
     return KSH_ERR_OK;
 }
 
+KshErr ksh_token_actual(Token *tok)
+{
+    KshErr err;
+    StrView text;
+    switch (tok->type) {
+        case TOKEN_TYPE_STRING:
+            tok->text.items += 1;
+            tok->text.len -= 2;
+            return KSH_ERR_OK;
+        case TOKEN_TYPE_VAR:
+            err = ksh_var_get_val((StrView){
+                .items = &tok->text.items[1],
+                .len = tok->text.len-1
+            }, &text);
+            if (err != KSH_ERR_OK) return err;
+            err = ksh_token_from_strv(text, tok);
+            if (err != KSH_ERR_OK) return err;
+            return ksh_token_actual(tok);
+        default: break;
+    }
+
+    return KSH_ERR_OK;
+}
+
 KshErr ksh_token_get_actual_data(Token tok, StrView *dest)
 {
     KshErr err;
@@ -224,51 +248,6 @@ bool ksh_token_type_fit_value_type(TokenType tt, KshValueTypeTag val_t)
                 return true;
 
     return false;
-}
-
-KshErr ksh_token_parse_to_value(Token tok, KshValueType type, KshValue *dest)
-{
-    if (type.tag == KSH_VALUE_TYPE_TAG_ANY) {
-        dest->as_str = tok.text;
-        return KSH_ERR_OK;
-    }
-
-    if (!ksh_token_type_fit_value_type(tok.type, type.tag))
-        return KSH_ERR_TYPE_EXPECTED;
-
-    StrView value;
-    Token token;
-    KshErr err;
-    switch (tok.type) {
-        case TOKEN_TYPE_LIT:
-            dest->as_str = tok.text;
-            break;
-        case TOKEN_TYPE_STRING:
-            dest->as_str = strv_new(&tok.text.items[1], tok.text.len-2);
-            break;
-        case TOKEN_TYPE_NUMBER:;
-            char *num_buf = (char *) malloc(tok.text.len);
-            if (!num_buf) return KSH_ERR_MEM_OVER;
-            memcpy(num_buf, tok.text.items, tok.text.len);
-            dest->as_int = atoi(num_buf);
-            free(num_buf);
-            break;
-        case TOKEN_TYPE_BOOL:
-            dest->as_bool = tok.text.items[0] == 't' ? 1 : 0;
-            break;
-        case TOKEN_TYPE_VAR:
-            err = ksh_var_get_val((StrView){
-                .items = &tok.text.items[1],
-                .len = tok.text.len-1
-            }, &value);
-            if (err != KSH_ERR_OK) return err;
-            err = ksh_token_from_strv(value, &token);
-            if (err != KSH_ERR_OK) return err;
-            return ksh_token_parse_to_value(token, type, dest);
-        default: return KSH_ERR_TYPE_EXPECTED;
-    }
-
-    return KSH_ERR_OK;
 }
 
 KshErr ksh_token_from_strv(StrView sv, Token *dest)

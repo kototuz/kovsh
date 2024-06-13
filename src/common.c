@@ -2,15 +2,48 @@
 #include <string.h>
 #include <stdlib.h>
 
-typedef KshErr (*KshParseFn)(void *type_info, KshValue *value);
+static KshErr str_parse_fn(StrView text, KshStrContext *context, KshValue *value);
+static KshErr int_parse_fn(StrView text, KshIntContext *context, KshValue *value);
+static KshErr enum_parse_fn(StrView text, KshEnumContext *context, KshValue *value);
+static KshErr bool_parse_fn(StrView text, void *context, KshValue *value);
 
-static KshErr parse_enum(KshValueTypeEnum *, KshValue *);
-// TODO:
-// static KshErr parse_array(StrView, KshArrayInfo *, KshValue *);
+typedef KshErr (*ParseFn)(StrView text, void *context, KshValue *dest);
 
-static const KshParseFn parsers[] = {
-    [KSH_VALUE_TYPE_TAG_ENUM] = (KshParseFn) parse_enum
+static const struct {
+    ParseFn parse_fn;
+    const char *name;
+    TokenType *expected_ttypes;
+    size_t expected_ttypes_len;
+} types[] = {
+    [KSH_VALUE_TYPE_TAG_STR]  = { 
+        .parse_fn = (ParseFn) str_parse_fn,
+        .name = "string",
+        .expected_ttypes_len = 2,
+        .expected_ttypes = (TokenType[]){
+            TOKEN_TYPE_STRING,
+            TOKEN_TYPE_LIT
+        }
+    },
+    [KSH_VALUE_TYPE_TAG_INT]  = {
+        .parse_fn = (ParseFn) int_parse_fn,
+        .name = "integer",
+        .expected_ttypes_len = 1,
+        .expected_ttypes = (TokenType[]){TOKEN_TYPE_NUMBER}
+    },
+    [KSH_VALUE_TYPE_TAG_BOOL] = {
+        .parse_fn = (ParseFn) bool_parse_fn,
+        .name = "bool",
+        .expected_ttypes_len = 1,
+        .expected_ttypes = (TokenType[]){TOKEN_TYPE_BOOL}
+    },
+    [KSH_VALUE_TYPE_TAG_ENUM] = {
+        .parse_fn = (ParseFn) enum_parse_fn,
+        .name = "enum",
+        .expected_ttypes_len = 1,
+        .expected_ttypes = (TokenType[]){TOKEN_TYPE_LIT}
+    }
 };
+#define TYPES_COUNT (sizeof(types)/sizeof(types[0]))
 
 const char *ksh_err_str(KshErr err)
 {
@@ -40,6 +73,17 @@ bool strv_eq(StrView sv1, StrView sv2)
            (memcmp(sv1.items, sv2.items, sv1.len) == 0);
 }
 
+bool ksh_val_type_eq_ttype(KshValueTypeTag type_tag, TokenType tt)
+{
+    if (type_tag >= TYPES_COUNT) return false;
+
+    for (size_t i = 0; i < types[type_tag].expected_ttypes_len; i++) {
+        if (types[type_tag].expected_ttypes[i] == tt) return true;
+    }
+
+    return false;
+}
+
 const char *ksh_val_type_tag_str(KshValueTypeTag t)
 {
     switch (t) {
@@ -50,20 +94,62 @@ const char *ksh_val_type_tag_str(KshValueTypeTag t)
     }
 }
 
-KshErr ksh_val_parse(KshValueType type, KshValue *dest)
+KshErr ksh_val_parse(StrView text, KshValueTypeInst instance, KshValue *value)
 {
-    if (type.info == NULL) return KSH_ERR_OK;
-    return parsers[type.tag](type.info, dest);
+    if (instance.type_tag >= TYPES_COUNT) return KSH_ERR_TYPE_EXPECTED;
+    return types[instance.type_tag].parse_fn(text, instance.context, value);
 }
 
-KshErr parse_enum(KshValueTypeEnum *info, KshValue *value)
+static KshErr str_parse_fn(StrView text, KshStrContext *context, KshValue *value)
 {
-    for (size_t i = 0; i < info->cases_len; i++)
-        if (strv_eq(value->as_str, info->cases[i])) {
-            *value = (KshValue){ .as_int = i };
+    if (context) {
+        if (text.len > context->max_line_len ||
+            text.len < context->min_line_len) {
+            return KSH_ERR_CONTEXT;
+        }
+    }
+
+    value->as_str = text;
+
+    return KSH_ERR_OK;
+}
+
+static KshErr int_parse_fn(StrView text, KshIntContext *context, KshValue *value)
+{
+    char *buf = (char *) malloc(text.len);
+    if (!buf) return KSH_ERR_MEM_OVER;
+
+    memcpy(buf, text.items, text.len);
+    int i = atoi(buf);
+    free(buf);
+
+    if (context) {
+        if (i > context->max ||
+            i < context->min) {
+            return KSH_ERR_CONTEXT;
+        }
+    }
+
+    value->as_int = i;
+    return KSH_ERR_OK;
+}
+
+static KshErr bool_parse_fn(StrView text, void *context, KshValue *value)
+{
+    (void) context;
+
+    value->as_bool = text.items[0] == 't' ? 1 : 0;
+    return KSH_ERR_OK;
+}
+
+static KshErr enum_parse_fn(StrView text, KshEnumContext *context, KshValue *value)
+{
+    for (size_t i = 0; i < context->cases_len; i++) {
+        if (strv_eq(text, context->cases[i])) {
+            value->as_int = i;
             return KSH_ERR_OK;
         }
+    }
 
-    // TODO: add error type
-    return 1;
+    return KSH_ERR_CONTEXT;
 }

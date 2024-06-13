@@ -25,7 +25,7 @@ void ksh_cmd_print(Command cmd)
     for (size_t i = 0; i < cmd.args_len; i++) {
         printf("\t"STRV_FMT"=<%s>\t%s\n",
                STRV_ARG(cmd.args[i].name),
-               ksh_val_type_tag_str(cmd.args[i].value_type.tag),
+               "TODO", // TODO
                cmd.args[i].usage);
     }
 }

@@ -28,13 +28,20 @@ typedef enum {
     KSH_ERR_MEM_OVER,
     KSH_ERR_PATTERN_NOT_FOUND,
     KSH_ERR_VAR_NOT_FOUND,
-    KSH_ERR_NAME_ALREADY_EXISTS
+    KSH_ERR_NAME_ALREADY_EXISTS,
+    KSH_ERR_CONTEXT
 } KshErr;
 
 typedef struct {
     size_t len;
     const char *items;
 } StrView;
+
+typedef union {
+    StrView as_str;
+    int     as_int;
+    bool    as_bool;
+} KshValue;
 
 typedef enum {
     KSH_VALUE_TYPE_TAG_STR,
@@ -45,20 +52,39 @@ typedef enum {
 } KshValueTypeTag;
 
 typedef struct {
-    void *info;
-    KshValueTypeTag tag;
-} KshValueType;
+    KshValueTypeTag type_tag;
+    void *context;
+} KshValueTypeInst;
+
+typedef struct {
+    size_t max_line_len;
+    size_t min_line_len;
+} KshStrContext;
+
+typedef struct {
+    int max;
+    int min;
+} KshIntContext;
 
 typedef struct {
     StrView *cases;
     size_t cases_len;
-} KshValueTypeEnum;
+} KshEnumContext;
 
-typedef union {
-    StrView as_str;
-    int     as_int;
-    bool    as_bool;
-} KshValue;
+typedef enum {
+    TOKEN_TYPE_LIT,
+    TOKEN_TYPE_STRING,
+    TOKEN_TYPE_NUMBER,
+    TOKEN_TYPE_BOOL,
+    TOKEN_TYPE_VAR,
+    TOKEN_TYPE_EQ,
+    TOKEN_TYPE_KEYWORD_SYS,
+    TOKEN_TYPE_INVALID,
+
+    TOKEN_TYPE_END,
+    TOKEN_TYPE_ENUM_END,
+    TOKEN_TYPE_PLUS
+} TokenType;
 
 const char *ksh_err_str(KshErr err);
 
@@ -66,8 +92,9 @@ StrView strv_from_str(const char *str);
 StrView strv_new(const char *data, size_t data_len);
 bool    strv_eq(StrView sv1, StrView sv2);
 
+bool        ksh_val_type_eq_ttype(KshValueTypeTag type_tag, TokenType ttype);
 const char *ksh_val_type_tag_str(KshValueTypeTag t);
-KshErr      ksh_val_parse(KshValueType type, KshValue *value);
+KshErr      ksh_val_parse(StrView text, KshValueTypeInst inst, KshValue *value);
 
 ///////////////////////////////////////////////
 /// COMMAND
@@ -81,7 +108,7 @@ typedef struct {
 typedef struct {
     StrView name;
     const char *usage;
-    KshValueType value_type;
+    KshValueTypeInst type_inst;
     ArgValue value;
 } Arg;
 
@@ -115,7 +142,6 @@ struct Command {
     CommandSet subcommands;
 };
 
-
 void ksh_cmd_print(Command cmd);
 Command *ksh_cmd_find_local(CommandSet set, StrView sv);
 Command *ksh_cmd_find_hardcoded(StrView sv);
@@ -131,21 +157,6 @@ void ksh_arg_print(Arg);
 ///////////////////////////////////////////////
 /// LEXER
 //////////////////////////////////////////////
-
-typedef enum {
-    TOKEN_TYPE_LIT,
-    TOKEN_TYPE_STRING,
-    TOKEN_TYPE_NUMBER,
-    TOKEN_TYPE_BOOL,
-    TOKEN_TYPE_VAR,
-    TOKEN_TYPE_EQ,
-    TOKEN_TYPE_KEYWORD_SYS,
-    TOKEN_TYPE_INVALID,
-
-    TOKEN_TYPE_END,
-    TOKEN_TYPE_ENUM_END,
-    TOKEN_TYPE_PLUS
-} TokenType;
 
 typedef struct {
     TokenType type;
@@ -166,9 +177,7 @@ bool ksh_lexer_is_next_token(Lexer *l, TokenType tt);
 bool ksh_lexer_next_token_if(Lexer *l, TokenType tt, Token *t);
 KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
 
-bool   ksh_token_type_fit_value_type(TokenType, KshValueTypeTag);
-KshErr ksh_token_get_actual_data(Token tok, StrView *dest);
-KshErr ksh_token_parse_to_value(Token tok, KshValueType type, KshValue *dest);
+KshErr ksh_token_actual(Token *tok);
 KshErr ksh_token_from_strv(StrView sv, Token *dest);
 KshErr ksh_token_type_to_value(TokenType t, KshValueTypeTag *dest);
 
@@ -176,6 +185,7 @@ KshErr ksh_token_type_to_value(TokenType t, KshValueTypeTag *dest);
 /// MAIN USAGE
 //////////////////////////////////////////////
 
+// TODO: add a type for variable values
 typedef struct {
     StrView name;
     struct {
