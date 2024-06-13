@@ -96,7 +96,7 @@ KshErr ksh_parse(StrView sv, CommandCall *dest)
     if (err != KSH_ERR_OK) return err;
     err = args_eval(&lex, dest);
 
-    return KSH_ERR_OK;
+    return err;
 }
 
 void ksh_use_command_set(CommandSet set)
