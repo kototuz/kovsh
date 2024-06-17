@@ -16,14 +16,14 @@ static KshErr    set_dyn_var(StrView name, StrView value);
 static int builtin_list_var(ArgValueCopy *args);
 static int builtin_set_var(ArgValueCopy *args);
 static int builtin_print(ArgValueCopy *args);
+static int builtin_about(ArgValueCopy *args);
 
 static KshErr cmd_eval(Lexer *lex, CommandCall *cmd_call);
 static KshErr args_eval(Lexer *lex, CommandCall *cmd_call);
 
 
-
 static CommandSet builtin_commands = {
-    .len = 2,
+    .len = 3,
     .items = (Command[]){
         {
             .name = STRV_LIT("var"),
@@ -60,6 +60,19 @@ static CommandSet builtin_commands = {
                 {
                     .name = STRV_LIT("msg"),
                     .usage = "Message to print",
+                    .type_inst.type_tag = KSH_VALUE_TYPE_TAG_STR
+                }
+            }
+        },
+        {
+            .name = STRV_LIT("about"),
+            .desc = "Prints information about specifed command",
+            .fn = builtin_about,
+            .args_len = 1,
+            .args = (Arg[]){
+                {
+                    .name = STRV_LIT("cmd"),
+                    .usage = "Command",
                     .type_inst.type_tag = KSH_VALUE_TYPE_TAG_STR
                 }
             }
@@ -287,5 +300,16 @@ static int builtin_set_var(ArgValueCopy *args)
 static int builtin_print(ArgValueCopy *args)
 {
     printf(STRV_FMT"\n", STRV_ARG(args[0].value.data.as_str));
+    return 0;
+}
+
+static int builtin_about(ArgValueCopy *args)
+{
+    Command *cmd = ksh_cmd_find(commands[0], args[0].value.data.as_str);
+    if (!cmd) cmd = ksh_cmd_find(commands[1], args[0].value.data.as_str);
+    if (!cmd) return 1;
+
+    ksh_cmd_print(*cmd);
+
     return 0;
 }
