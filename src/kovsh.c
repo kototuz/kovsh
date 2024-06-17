@@ -203,10 +203,7 @@ static KshErr cmd_eval(Lexer *l, CommandCall *cmd_call)
     Command *cmd;
     cmd = ksh_cmd_find(commands[0], tok.text);
     if (!cmd) cmd = ksh_cmd_find(commands[1], tok.text);
-    if (!cmd) {
-        KSH_LOG_ERR("command not found: `"STRV_FMT"`", STRV_ARG(tok.text));
-        return KSH_ERR_COMMAND_NOT_FOUND;
-    }
+    if (!cmd) return KSH_ERR_COMMAND_NOT_FOUND;
 
     if (cmd->subcommands.len > 0) 
         while (ksh_lexer_peek_token(l, &tok) &&
@@ -242,18 +239,14 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
             cmd_call->last_assigned_idx = 
                 &cmd_call->args[cmd_call->last_assigned_idx] - cmd_call->args + 1;
         } else {
-            if (cmd_call->last_assigned_idx >= cmd_call->args_len) {
-                KSH_LOG_ERR("last arg not found%s", "");
+            if (cmd_call->last_assigned_idx >= cmd_call->args_len)
                 return KSH_ERR_ARG_NOT_FOUND;
-            }
+
             arg_val = arg_name;
             arg = &cmd_call->args[cmd_call->last_assigned_idx++];
         }
 
-        if (arg == NULL) {
-            KSH_LOG_ERR("arg not found: `"STRV_FMT"`", STRV_ARG(arg_name.text));
-            return KSH_ERR_ARG_NOT_FOUND;
-        }
+        if (arg == NULL) return KSH_ERR_ARG_NOT_FOUND;
 
         err = ksh_token_actual(&arg_val);
         if (err != KSH_ERR_OK) return err;

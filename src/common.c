@@ -51,7 +51,13 @@ const char *ksh_err_str(KshErr err)
     case KSH_ERR_COMMAND_NOT_FOUND: return "command not found";
     case KSH_ERR_ARG_NOT_FOUND: return "arg not found";
     case KSH_ERR_TOKEN_EXPECTED: return "token was expected";
+    case KSH_ERR_UNDEFINED_TOKEN: return "token is undefined";
     case KSH_ERR_TYPE_EXPECTED: return "type was expected";
+    case KSH_ERR_ASSIGNMENT_EXPECTED: return "arg must be assigned";
+    case KSH_ERR_MEM_OVER: return "memory is over";
+    case KSH_ERR_VAR_NOT_FOUND: return "variable not found";
+    case KSH_ERR_NAME_ALREADY_EXISTS: return "name already exists";
+    case KSH_ERR_CONTEXT: return "arg doesn't fit the context";
     default: return "unknown";
     }
 }

@@ -185,11 +185,7 @@ bool ksh_lexer_next_token_if(Lexer *l, TokenType tt, Token *t)
 KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out)
 {
     if (!ksh_lexer_next_token(l, out)
-        || out->type != expect) {
-        KSH_LOG_ERR("token_expected: %s was expected",
-                    ksh_lexer_token_type_to_string(expect));
-        return KSH_ERR_TOKEN_EXPECTED;
-    }
+        || out->type != expect) return KSH_ERR_TOKEN_EXPECTED;
 
     return KSH_ERR_OK;
 }
@@ -264,7 +260,7 @@ KshErr ksh_token_from_strv(StrView sv, Token *dest)
                 return KSH_ERR_OK;
     }
 
-    return KSH_ERR_PATTERN_NOT_FOUND;
+    return KSH_ERR_UNDEFINED_TOKEN;
 }
 
 static bool parse_spec_sym_token(StrView sv, SpecialSymbol *spec_sym, Token *out)

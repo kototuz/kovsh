@@ -67,12 +67,12 @@ int main(void)
         prompt.items = text;
         err = ksh_parse(prompt, &cmd_call);
         if (err != KSH_ERR_OK) {
-            printf("ERROR: %d\n", err);
+            printf("ERROR: %s\n", ksh_err_str(err));
             return err;
         }
         err = ksh_cmd_call_execute(cmd_call);
         if (err != KSH_ERR_OK) {
-            printf("ERROR: %d\n", err);
+            printf("ERROR: %s\n", ksh_err_str(err));
             return err;
         }
     }
