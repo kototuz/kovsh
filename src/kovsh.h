@@ -84,6 +84,11 @@ typedef enum {
     TOKEN_TYPE_PLUS
 } TokenType;
 
+typedef struct {
+    TokenType type;
+    StrView text;
+} Token;
+
 const char *ksh_err_str(KshErr err);
 
 StrView strv_from_str(const char *str);
@@ -93,6 +98,7 @@ bool    strv_eq(StrView sv1, StrView sv2);
 bool        ksh_val_type_eq_ttype(KshValueTypeTag type_tag, TokenType ttype);
 const char *ksh_val_type_tag_str(KshValueTypeTag t);
 KshErr      ksh_val_parse(StrView text, KshValueTypeInst inst, KshValue *value);
+KshErr      ksh_val_from_token(Token tok, KshValueTypeInst inst, KshValue *value);
 
 ///////////////////////////////////////////////
 /// COMMAND
@@ -155,11 +161,6 @@ void ksh_arg_print(Arg);
 ///////////////////////////////////////////////
 /// LEXER
 //////////////////////////////////////////////
-
-typedef struct {
-    TokenType type;
-    StrView text;
-} Token;
 
 typedef struct {
     StrView text;

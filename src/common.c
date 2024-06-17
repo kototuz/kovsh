@@ -81,6 +81,7 @@ bool strv_eq(StrView sv1, StrView sv2)
 
 bool ksh_val_type_eq_ttype(KshValueTypeTag type_tag, TokenType tt)
 {
+    if (type_tag == KSH_VALUE_TYPE_TAG_ANY) return true;
     if (type_tag >= TYPES_COUNT) return false;
 
     for (size_t i = 0; i < types[type_tag].expected_ttypes_len; i++) {
@@ -105,6 +106,24 @@ KshErr ksh_val_parse(StrView text, KshValueTypeInst instance, KshValue *value)
     if (instance.type_tag >= TYPES_COUNT) return KSH_ERR_TYPE_EXPECTED;
     return types[instance.type_tag].parse_fn(text, instance.context, value);
 }
+
+KshErr ksh_val_from_token(Token tok, KshValueTypeInst instance, KshValue *value)
+{
+    if (instance.type_tag == KSH_VALUE_TYPE_TAG_ANY) {
+        value->as_str = tok.text;
+        return KSH_ERR_OK;
+    }
+
+    KshErr err = ksh_token_actual(&tok);
+    if (err != KSH_ERR_OK) return err;
+
+    if (!ksh_val_type_eq_ttype(instance.type_tag, tok.type))
+        return KSH_ERR_TYPE_EXPECTED;
+
+    return types[instance.type_tag].parse_fn(tok.text, instance.context, value);
+}
+
+
 
 static KshErr str_parse_fn(StrView text, KshStrContext *context, KshValue *value)
 {

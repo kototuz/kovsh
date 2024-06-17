@@ -45,7 +45,7 @@ static CommandSet builtin_commands = {
                         {
                             .name = STRV_LIT("value"),
                             .usage = "Variable value",
-                            .type_inst.type_tag = KSH_VALUE_TYPE_TAG_STR
+                            .type_inst.type_tag = KSH_VALUE_TYPE_TAG_ANY
                         }
                     }
                 }
@@ -248,13 +248,7 @@ static KshErr args_eval(Lexer *lex, CommandCall *cmd_call)
 
         if (arg == NULL) return KSH_ERR_ARG_NOT_FOUND;
 
-        err = ksh_token_actual(&arg_val);
-        if (err != KSH_ERR_OK) return err;
-
-        if (!ksh_val_type_eq_ttype(arg->arg_ptr->type_inst.type_tag, arg_val.type))
-            return KSH_ERR_TYPE_EXPECTED;
-
-        err = ksh_val_parse(arg_val.text, arg->arg_ptr->type_inst, &arg->value.data);
+        err = ksh_val_from_token(arg_val, arg->arg_ptr->type_inst, &arg->value.data);
         if (err != KSH_ERR_OK) return err;
 
         arg->value.is_assigned = true;
