@@ -30,12 +30,6 @@ if [ $# -eq 1 ]; then
         "clean")
             rm -rf $obj_dir/* $bin_dir/*
             ;;
-        "examples")
-            for e in $examples
-            do
-                echo $(basename $e)
-            done
-            ;;
     esac
 else
     for s in $sources
