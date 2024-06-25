@@ -35,6 +35,8 @@ typedef struct {
     const char *items;
 } StrView;
 
+typedef StrView Token;
+
 typedef union {
     StrView as_str;
     int     as_int;
@@ -69,33 +71,12 @@ typedef struct {
     size_t cases_len;
 } KshEnumContext;
 
-typedef enum {
-    TOKEN_TYPE_LIT,
-    TOKEN_TYPE_STRING,
-    TOKEN_TYPE_NUMBER,
-    TOKEN_TYPE_BOOL,
-    TOKEN_TYPE_VAR,
-    TOKEN_TYPE_EQ,
-    TOKEN_TYPE_KEYWORD_SYS,
-    TOKEN_TYPE_INVALID,
-
-    TOKEN_TYPE_END,
-    TOKEN_TYPE_ENUM_END,
-    TOKEN_TYPE_PLUS
-} TokenType;
-
-typedef struct {
-    TokenType type;
-    StrView text;
-} Token;
-
 const char *ksh_err_str(KshErr err);
 
 StrView strv_from_str(const char *str);
 StrView strv_new(const char *data, size_t data_len);
 bool    strv_eq(StrView sv1, StrView sv2);
 
-bool        ksh_val_type_eq_ttype(KshValueTypeTag type_tag, TokenType ttype);
 const char *ksh_val_type_tag_str(KshValueTypeTag t);
 KshErr      ksh_val_parse(StrView text, KshValueTypeInst inst, KshValue *value);
 KshErr      ksh_val_from_token(Token tok, KshValueTypeInst inst, KshValue *value);
@@ -169,16 +150,9 @@ typedef struct {
 } Lexer;
 
 Lexer ksh_lexer_new(StrView sv);
-const char *ksh_lexer_token_type_to_string(TokenType token_type);
 bool ksh_lexer_peek_token(Lexer *l, Token *t);
 bool ksh_lexer_next_token(Lexer *l, Token *t);
-bool ksh_lexer_is_next_token(Lexer *l, TokenType tt);
-bool ksh_lexer_next_token_if(Lexer *l, TokenType tt, Token *t);
-KshErr ksh_lexer_expect_next_token(Lexer *l, TokenType expect, Token *out);
-
-KshErr ksh_token_actual(Token *tok);
-KshErr ksh_token_from_strv(StrView sv, Token *dest);
-KshErr ksh_token_type_to_value(TokenType t, KshValueTypeTag *dest);
+KshErr ksh_lexer_expect_next_token(Lexer *l, Token expected, Token *out);
 
 ///////////////////////////////////////////////
 /// MAIN USAGE
