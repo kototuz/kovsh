@@ -83,7 +83,7 @@ static bool isend(int s)
 static bool isbound(int s)
 {
     return isspace(s) ||
-           ispunct(s) ||
+           ispunct(s) || // TODO: make a separate function
            isend(s);
 }
 
