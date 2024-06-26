@@ -23,7 +23,7 @@ bool ksh_lexer_peek_token(Lexer *l, Token *t)
 
     Token result = { .items = &l->text.items[l->cursor] };
 
-    if (result.items[0] == '\0') return false;
+    if (isend(result.items[0])) return false;
 
     if (isspace(result.items[0])) {
         while (isspace(result.items[++result.len]));
