@@ -18,6 +18,8 @@ typedef enum {
     KSH_ERR_TOKEN_EXPECTED,
 } KshErr;
 
+const char *ksh_err_str(KshErr err);
+
 typedef struct {
     size_t len;
     const char *items;
