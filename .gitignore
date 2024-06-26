@@ -1,4 +1,5 @@
 *.swp
 *.o
+*.out
 zig-cache
 out
