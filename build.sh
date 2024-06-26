@@ -1,10 +1,10 @@
 #!/bin/bash
 
-mkdir -p out/objs
-mkdir -p out/bin
-
 cc=gcc
 cflags="-Wall -Wextra -Wpedantic -g"
 src=src/kovsh.c
 
-$cc $cflags -o test.out $src
+if [[ $1 == "test" ]]
+then $cc $cflags -o test.out $src
+else $cc $cflags -o test.o -c $src
+fi

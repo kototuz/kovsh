@@ -3,6 +3,7 @@
 #include "lexer.c"
 #include "strv.c"
 #include "context.c"
+#include "err.c"
 
 #include <unistd.h>
 #include <assert.h>
@@ -57,6 +58,8 @@ static KshCommand *get_cmd(StrView name)
     return NULL;
 }
 
+
+
 static int print(KshContext ctx)
 {
     KshErr err = ksh_ctx_init(&ctx, 2);
@@ -70,17 +73,25 @@ static int print(KshContext ctx)
     if (!ksh_ctx_get_param(&ctx, STRV_LIT("rep"), KSH_PARAM_TYPE_INT, &repeat))
         repeat = 1;
 
-    printf(STRV_FMT"\n", STRV_ARG(msg));
+    for (int i = 0; i < repeat; i++)
+        printf(STRV_FMT"\n", STRV_ARG(msg));
 
     return 0;
 }
 
 int main()
 {
-    ksh_use_commands({STRV_LIT_DYN("print"), print});
-    KshErr err = ksh_parse(STRV_LIT_DYN("print --msg 'Hello, World' --rep"));
-    if (err != 0) fprintf(stderr, "ERROR: %d\n", err);
+    ksh_use_commands({STRV_LIT("print"), print});
 
-    return err;
+    char buf[100];
+    printf(">>> ");
+    while (fgets(buf, sizeof(buf), stdin)) {
+        if (strcmp(buf, "q\n") == 0) return 0;
+        KshErr err = ksh_parse(strv_from_str(buf));
+        if (err != 0) fprintf(stderr, "ERROR: %s\n", ksh_err_str(err));
+        printf(">>> ");
+    }
+
+    return 0;
 }
 
