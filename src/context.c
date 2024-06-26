@@ -18,16 +18,15 @@ static const ParseFn parsemap[] = {
 
 KshErr ksh_ctx_init_(KshContext *ctx, size_t size, KshArg arg_buf[size])
 {
-    static Token s = STRV_LIT("-");
     KshArg result;
     KshErr err;
     size_t count = 0;
     Lexer *lex = ctx->lex;
 
     while (count < size && ksh_lexer_peek_token(lex, &result.name)) {
-        err = ksh_lexer_expect_next_token(lex, s);
+        err = ksh_lexer_expect_next_token(lex, STRV_LIT("-"));
         if (err != KSH_ERR_OK) return err;
-        err = ksh_lexer_expect_next_token(lex, s);
+        err = ksh_lexer_expect_next_token(lex, STRV_LIT("-"));
         if (err != KSH_ERR_OK) return err;
 
         if (!ksh_lexer_next_token(lex, &result.name))

@@ -63,12 +63,12 @@ static int print(KshContext ctx)
     if (err != KSH_ERR_OK) return err;
 
     StrView msg;
-    if (!ksh_ctx_get_param(&ctx, STRV_LIT_DYN("msg"), KSH_PARAM_TYPE_STR, &msg))
+    if (!ksh_ctx_get_param(&ctx, STRV_LIT("msg"), KSH_PARAM_TYPE_STR, &msg))
         return 1;
 
-    if (ksh_ctx_get_option(&ctx, STRV_LIT_DYN("rep"))) {
-        for (;;) printf(STRV_FMT"\n", STRV_ARG(msg));
-    }
+    int repeat;
+    if (!ksh_ctx_get_param(&ctx, STRV_LIT("rep"), KSH_PARAM_TYPE_INT, &repeat))
+        repeat = 1;
 
     printf(STRV_FMT"\n", STRV_ARG(msg));
 

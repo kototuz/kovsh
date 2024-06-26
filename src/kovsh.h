@@ -8,23 +8,14 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#define STRV_LIT(lit) { sizeof(lit)-1, (lit) }
-#define STRV_LIT_DYN(lit) (StrView){ sizeof(lit)-1, (lit) }
+#define STRV_LIT(lit) (StrView){ sizeof(lit)-1, (lit) }
 #define STRV_FMT "%.*s"
 #define STRV_ARG(sv) (int) (sv).len, (sv).items
 
 typedef enum {
     KSH_ERR_OK = 0,
     KSH_ERR_COMMAND_NOT_FOUND,
-    KSH_ERR_ARG_NOT_FOUND,
     KSH_ERR_TOKEN_EXPECTED,
-    KSH_ERR_UNDEFINED_TOKEN,
-    KSH_ERR_TYPE_EXPECTED,
-    KSH_ERR_ASSIGNMENT_EXPECTED,
-    KSH_ERR_MEM_OVER,
-    KSH_ERR_VAR_NOT_FOUND,
-    KSH_ERR_NAME_ALREADY_EXISTS,
-    KSH_ERR_CONTEXT,
 } KshErr;
 
 typedef struct {
