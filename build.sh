@@ -5,8 +5,6 @@ mkdir -p out/bin
 
 cc=gcc
 cflags="-Wall -Wextra -Wpedantic -g"
-src=src/*
+src=src/kovsh.c
 
-for i in $src; do
-    $cc $cflags -o ${i/.c/.o} -c $i
-done
+$cc $cflags -o test.out $src
