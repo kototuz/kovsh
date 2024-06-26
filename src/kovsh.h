@@ -44,6 +44,13 @@ typedef struct {
 } KshArg;
 
 typedef struct {
+    StrView text;
+    size_t cursor;
+    Token buf;
+} Lexer;
+
+typedef struct {
+    Lexer *lex;
     KshArg *args;
     size_t args_count;
 } KshContext;
@@ -53,8 +60,6 @@ typedef int (*KshCommandFn)(KshContext);
 typedef struct {
     StrView name;
     KshCommandFn fn;
-    size_t max_args;
-    const char *description;
 } KshCommand;
 
 typedef struct {
@@ -67,9 +72,18 @@ typedef enum {
     KSH_PARAM_TYPE_INT,
 } KshParamType;
 
-void ksh_use_commands(KshCommands commands);
+#define ksh_use_commands(...) \
+    ksh_use_commands_( \
+        sizeof((KshCommand[]){__VA_ARGS__})/sizeof(KshCommand), \
+        (KshCommand[]){__VA_ARGS__} \
+    ) \
 
-bool ksh_ctx_get_param(KshContext ctx, StrView name, KshParamType param_type, void *res);
-bool ksh_ctx_get_option(KshContext ctx, StrView name);
+void ksh_use_commands_(size_t size, KshCommand buf[size]);
+
+#define ksh_ctx_init(ctx, count) ksh_ctx_init_((ctx), (count), (KshArg[(count)]){0})
+
+KshErr ksh_ctx_init_(KshContext *ctx, size_t size, KshArg arg_buf[size]);
+bool ksh_ctx_get_param(KshContext *ctx, StrView name, KshParamType param_type, void *res);
+bool ksh_ctx_get_option(KshContext *ctx, StrView name);
 
 #endif

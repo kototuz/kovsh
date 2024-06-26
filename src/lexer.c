@@ -1,12 +1,6 @@
 #include "kovsh.h"
 #include <ctype.h>
 
-typedef struct {
-    StrView text;
-    size_t cursor;
-    Token buf;
-} Lexer;
-
 static Lexer ksh_lexer_new(StrView sv);
 static bool ksh_lexer_peek_token(Lexer *l, Token *t);
 static bool ksh_lexer_next_token(Lexer *l, Token *t);
@@ -91,7 +85,6 @@ int test()
 {
     Lexer lex = ksh_lexer_new(strv_from_str("Neque porro quisquam est qui dolorem ipsum quia dolor\t\rsit amet, consectetur, adipisci velit, msg='Hello, World'"));
     
-    Token tok;
     assert(ksh_lexer_expect_next_token(&lex, strv_from_str("Neque")) == KSH_ERR_OK);
     assert(ksh_lexer_expect_next_token(&lex, strv_from_str("porro")) == KSH_ERR_OK);
     assert(ksh_lexer_expect_next_token(&lex, strv_from_str("moon")) == KSH_ERR_TOKEN_EXPECTED);

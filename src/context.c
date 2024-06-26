@@ -2,8 +2,7 @@
 typedef bool (*ParseFn)(StrView in, void *res);
 
 
-
-static KshArg *get_arg(KshContext ctx, StrView name);
+static KshArg *ksh_ctx_get_arg(KshContext *ctx, StrView name);
 
 static bool parse_str(StrView in, StrView *res);
 static bool parse_int(StrView in, int *res);
@@ -17,24 +16,67 @@ static const ParseFn parsemap[] = {
 
 
 
-bool ksh_ctx_get_param(KshContext ctx,
+KshErr ksh_ctx_init_(KshContext *ctx, size_t size, KshArg arg_buf[size])
+{
+    static Token s = STRV_LIT("-");
+    KshArg result;
+    KshErr err;
+    size_t count = 0;
+    Lexer *lex = ctx->lex;
+
+    while (count < size && ksh_lexer_peek_token(lex, &result.name)) {
+        err = ksh_lexer_expect_next_token(lex, s);
+        if (err != KSH_ERR_OK) return err;
+        err = ksh_lexer_expect_next_token(lex, s);
+        if (err != KSH_ERR_OK) return err;
+
+        if (!ksh_lexer_next_token(lex, &result.name))
+            return KSH_ERR_TOKEN_EXPECTED;
+
+        if (
+            !ksh_lexer_next_token(lex, &result.value) ||
+            result.value.items[0] == '-' // TODO: make a separate function
+        ) result.value = (StrView){0};
+
+        arg_buf[count++] = result;
+    }
+
+    ctx->args = arg_buf;
+    ctx->args_count = count;
+    return KSH_ERR_OK;
+}
+
+bool ksh_ctx_get_param(KshContext *ctx,
                        StrView name,
                        KshParamType param_type,
                        void *res)
 {
-    KshArg *arg = get_arg(ctx, name);
+    KshArg *arg = ksh_ctx_get_arg(ctx, name);
     if (!arg) return false;
 
     return parsemap[param_type](arg->value, res);
 }
 
-bool ksh_ctx_get_option(KshContext ctx, StrView name)
+bool ksh_ctx_get_option(KshContext *ctx, StrView name)
 {
-    KshArg *arg = get_arg(ctx, name);
+    KshArg *arg = ksh_ctx_get_arg(ctx, name);
     return arg && !arg->value.items;
 }
 
 
+
+static KshArg *ksh_ctx_get_arg(KshContext *ctx, StrView name)
+{
+    size_t args_count = ctx->args_count;
+    KshArg *args = ctx->args;
+    for (size_t i = 0; i < args_count; i++) {
+        if (strv_eq(args[i].name, name)) {
+            return &args[i];
+        }
+    }
+
+    return NULL;
+}
 
 static bool parse_str(StrView in, StrView *res)
 {
@@ -57,15 +99,4 @@ static bool parse_int(StrView in, int *res)
 
     *res = result;
     return true;
-}
-
-static KshArg *get_arg(KshContext ctx, StrView name)
-{
-    for (size_t i = 0; i < ctx.args_count; i++) {
-        if (strv_eq(ctx.args[i].name, name)) {
-            return &ctx.args[i];
-        }
-    }
-
-    return NULL;
 }
