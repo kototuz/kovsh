@@ -1,10 +1,10 @@
 #include "kovsh.h"
 #include <ctype.h>
 
-static bool lex_peek_tok(Lexer *l, Token *t);
-static bool lex_next_tok(Lexer *l, Token *t);
-static bool lex_next_tok_if_tok(Lexer *l, Token expected);
-static bool lex_next_tok_if_pred(Lexer *l, bool (*predicate)(Token));
+static bool lex_peek(Lexer *l);
+static bool lex_next(Lexer *l);
+static bool lex_next_if(Lexer *l, Token expected);
+static bool lex_next_if_pred(Lexer *l, bool (*predicate)(Token));
 
 static bool isstr(int s);
 static bool isend(int s);
@@ -12,12 +12,9 @@ static bool isbound(int s);
 
 
 
-static bool lex_peek_tok(Lexer *l, Token *t)
+static bool lex_peek(Lexer *l)
 {
-    if (l->buf.items) {
-        *t = l->buf;
-        return true;
-    }
+    if (l->is_peek) return true;
 
     Token result = { .items = &l->text.items[l->cursor] };
 
@@ -38,34 +35,41 @@ static bool lex_peek_tok(Lexer *l, Token *t)
     } else
         while (!isbound(result.items[++result.len]));
 
-    l->buf = result;
-    *t = result;
+    l->is_peek = true;
+    l->cur_tok = result;
     return true;
 }
 
-static bool lex_next_tok(Lexer *l, Token *t)
+static bool lex_next(Lexer *l)
 {
-    if (lex_peek_tok(l, t)) {
-        l->cursor += t->len;
-        l->buf = (Token){0};
+    if (l->is_peek) {
+        l->cursor += l->cur_tok.len;
+        l->is_peek = false;
+        return true;
+    }
+
+    l->cur_tok = (Token){0};
+    if (lex_peek(l)) {
+        l->cursor += l->cur_tok.len;
+        l->is_peek = false;
         return true;
     }
 
     return false;
 }
 
-static bool lex_next_tok_if_tok(Lexer *l, Token expected)
+static bool lex_next_if(Lexer *l, Token expected)
 {
-    Token tok;
-    return lex_next_tok(l, &tok) &&
-           strv_eq(expected, tok);
+    return lex_peek(l)                   &&
+           strv_eq(l->cur_tok, expected) &&
+           lex_next(l);
 }
 
-static bool lex_next_tok_if_pred(Lexer *l, bool (*predicate)(Token))
+static bool lex_next_if_pred(Lexer *l, bool (*predicate)(Token))
 {
-    Token tok;
-    return lex_next_tok(l, &tok) &&
-           predicate(tok);
+    return lex_peek(l)           &&
+           predicate(l->cur_tok) &&
+           lex_next(l);
 }
 
 
@@ -87,15 +91,16 @@ static bool isbound(int s)
            isend(s);
 }
 
-int test()
+#ifdef MAIN
+int main()
 {
     Lexer lex = { 
-        .text = STRV_LIT("Neque porro quisquam est qui dolorem ipsum quia dolor\t\rsit amet, consectetur, adipisci velit, msg='Hello, World")
+        .text = STRV_LIT("\t\rprint -m Hello -n 10 --hello-world -bro say_hi -m hello_world\n")
     };
-    
-    assert(lex_next_tok_if_tok(&lex, strv_from_str("Neque")));
-    assert(lex_next_tok_if_tok(&lex, strv_from_str("porro")));
-    assert(lex_next_tok_if_tok(&lex, strv_from_str("moon")));
+
+    while (lex_next(&lex))
+        printf(STRV_FMT"\n", STRV_ARG(lex.cur_tok));
 
     return 0;
 }
+#endif
