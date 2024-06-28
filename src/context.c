@@ -7,7 +7,9 @@ static KshArg *ksh_ctx_get_arg(KshContext *ctx, StrView name);
 static bool parse_str(StrView in, StrView *res);
 static bool parse_int(StrView in, int *res);
 
-static bool arg_predicate(Token tok);
+static bool full_name_predicate(Token tok);
+static bool short_name_predicate(Token tok);
+static bool multiopt_predicate(Token tok);
 
 
 
@@ -20,24 +22,34 @@ static const ParseFn parsemap[] = {
 
 KshErr ksh_ctx_init_(KshContext *ctx, size_t size, KshArg arg_buf[size])
 {
-    KshArg result;
-    KshErr err;
     size_t count = 0;
     Lexer *lex = ctx->lex;
 
-    while (count < size && lex_peek_tok(lex, &result.name)) {
-        err = lex_next_tok_if_pred(lex, arg_predicate);
-        if (err != KSH_ERR_OK) return err;
+    while (count < size && lex_peek(lex)) {
+        if (lex_next_if_pred(lex, full_name_predicate)) {
+            arg_buf[count].name = (StrView){
+                lex->cur_tok.len-2,
+                &lex->cur_tok.items[2]
+            };
+        } else if (lex_next_if_pred(lex, short_name_predicate)) {
+            arg_buf[count].name = (StrView){ 1, &lex->cur_tok.items[1] };
+        } else if (lex_next_if_pred(lex, multiopt_predicate)) {
+            for (size_t i = 1; i < lex->cur_tok.len && count < size; i++) {
+                arg_buf[count++] = (KshArg){
+                    .name = (StrView){ 1, &lex->cur_tok.items[i] }
+                };
+            }
+            continue;
+        } else return KSH_ERR_TOKEN_EXPECTED;
 
-        result.name.items = &result.name.items[2];
-        result.name.len -= 2;
+        if (!lex_peek(lex) || lex->cur_tok.items[0] == '-') {
+            arg_buf[count].value = (StrView){0};
+        } else {
+            lex_next(lex);
+            arg_buf[count].value = lex->cur_tok;
+        }
 
-        if (
-            !lex_next_tok(lex, &result.value) ||
-            result.value.items[0] == '-' // TODO: make a separate function
-        ) result.value = (StrView){0};
-
-        arg_buf[count++] = result;
+        count += 1;
     }
 
     ctx->args = arg_buf;
@@ -100,9 +112,21 @@ static bool parse_int(StrView in, int *res)
     return true;
 }
 
-static bool arg_predicate(Token tok)
+static bool full_name_predicate(Token tok)
+{
+    return tok.len > 3         &&
+           tok.items[0] == '-' &&
+           tok.items[1] == '-';
+}
+
+static bool short_name_predicate(Token tok)
+{
+    return tok.len == 2 && tok.items[0] == '-';
+}
+
+static bool multiopt_predicate(Token tok)
 {
     return tok.len > 2         &&
            tok.items[0] == '-' &&
-           tok.items[1] == '-';
+           tok.items[1] != '-';
 }

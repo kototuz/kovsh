@@ -30,14 +30,13 @@ KshErr ksh_parse(StrView sv)
 {
     assert(commands.count);
 
-    Token tok;
     KshCommand *command;
     KshContext context = {0};
     Lexer lex = { .text = sv };
 
-    if (!lex_next_tok(&lex, &tok)) return KSH_ERR_OK;
+    if (!lex_next(&lex)) return KSH_ERR_OK;
 
-    command = get_cmd(tok);
+    command = get_cmd(lex.cur_tok);
     if (!command) return KSH_ERR_COMMAND_NOT_FOUND;
 
     context.lex = &lex;
@@ -59,6 +58,18 @@ static KshCommand *get_cmd(StrView name)
 }
 
 
+static int test(KshContext ctx)
+{
+    KshErr err = ksh_ctx_init(&ctx, 4);
+    if (err != KSH_ERR_OK) return err;
+
+    if (ksh_ctx_get_option(&ctx, STRV_LIT("f"))) puts("first");
+    if (ksh_ctx_get_option(&ctx, STRV_LIT("s"))) puts("second");
+    if (ksh_ctx_get_option(&ctx, STRV_LIT("t"))) puts("third");
+    if (ksh_ctx_get_option(&ctx, STRV_LIT("-"))) puts("dash");
+
+    return 0;
+}
 
 static int print(KshContext ctx)
 {
@@ -66,11 +77,11 @@ static int print(KshContext ctx)
     if (err != KSH_ERR_OK) return err;
 
     StrView msg;
-    if (!ksh_ctx_get_param(&ctx, STRV_LIT("msg"), KSH_PARAM_TYPE_STR, &msg))
+    if (!ksh_ctx_get_param(&ctx, STRV_LIT("m"), KSH_PARAM_TYPE_STR, &msg))
         return 1;
 
     int repeat;
-    if (!ksh_ctx_get_param(&ctx, STRV_LIT("rep"), KSH_PARAM_TYPE_INT, &repeat))
+    if (!ksh_ctx_get_param(&ctx, STRV_LIT("n"), KSH_PARAM_TYPE_INT, &repeat))
         repeat = 1;
 
     for (int i = 0; i < repeat; i++)
@@ -81,7 +92,10 @@ static int print(KshContext ctx)
 
 int main()
 {
-    ksh_use_commands({STRV_LIT("print"), print});
+    ksh_use_commands(
+        { STRV_LIT("test"), test },
+        { STRV_LIT("print"), print },
+    );
 
     char buf[100];
     printf(">>> ");

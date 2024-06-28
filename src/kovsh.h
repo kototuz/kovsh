@@ -39,7 +39,8 @@ typedef struct {
 typedef struct {
     StrView text;
     size_t cursor;
-    Token buf;
+    Token cur_tok;
+    bool is_peek;
 } Lexer;
 
 typedef struct {
