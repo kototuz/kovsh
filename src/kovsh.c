@@ -33,9 +33,9 @@ KshErr ksh_parse(StrView sv)
     Token tok;
     KshCommand *command;
     KshContext context = {0};
-    Lexer lex = ksh_lexer_new(sv);
+    Lexer lex = { .text = sv };
 
-    if (!ksh_lexer_next_token(&lex, &tok)) return KSH_ERR_OK;
+    if (!lex_next_tok(&lex, &tok)) return KSH_ERR_OK;
 
     command = get_cmd(tok);
     if (!command) return KSH_ERR_COMMAND_NOT_FOUND;

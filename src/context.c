@@ -25,15 +25,15 @@ KshErr ksh_ctx_init_(KshContext *ctx, size_t size, KshArg arg_buf[size])
     size_t count = 0;
     Lexer *lex = ctx->lex;
 
-    while (count < size && ksh_lexer_peek_token(lex, &result.name)) {
-        err = ksh_lexer_expect_next_token_pred(lex, arg_predicate);
+    while (count < size && lex_peek_tok(lex, &result.name)) {
+        err = lex_next_tok_if_pred(lex, arg_predicate);
         if (err != KSH_ERR_OK) return err;
 
         result.name.items = &result.name.items[2];
         result.name.len -= 2;
 
         if (
-            !ksh_lexer_next_token(lex, &result.value) ||
+            !lex_next_tok(lex, &result.value) ||
             result.value.items[0] == '-' // TODO: make a separate function
         ) result.value = (StrView){0};
 

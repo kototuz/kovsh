@@ -1,22 +1,18 @@
 #include "kovsh.h"
 #include <ctype.h>
 
-static Lexer ksh_lexer_new(StrView sv);
-static bool ksh_lexer_peek_token(Lexer *l, Token *t);
-static bool ksh_lexer_next_token(Lexer *l, Token *t);
-static KshErr ksh_lexer_expect_next_token(Lexer *l, Token expected);
-static KshErr ksh_lexer_expect_next_token_pred(Lexer *l, bool (*predicate)(Token));
+static bool lex_peek_tok(Lexer *l, Token *t);
+static bool lex_next_tok(Lexer *l, Token *t);
+static bool lex_next_tok_if_tok(Lexer *l, Token expected);
+static bool lex_next_tok_if_pred(Lexer *l, bool (*predicate)(Token));
 
 static bool isstr(int s);
 static bool isend(int s);
 static bool isbound(int s);
 
-Lexer ksh_lexer_new(StrView strv)
-{
-    return (Lexer){.text = strv};
-}
 
-bool ksh_lexer_peek_token(Lexer *l, Token *t)
+
+static bool lex_peek_tok(Lexer *l, Token *t)
 {
     if (l->buf.items) {
         *t = l->buf;
@@ -47,9 +43,9 @@ bool ksh_lexer_peek_token(Lexer *l, Token *t)
     return true;
 }
 
-bool ksh_lexer_next_token(Lexer *l, Token *t)
+static bool lex_next_tok(Lexer *l, Token *t)
 {
-    if (ksh_lexer_peek_token(l, t)) {
+    if (lex_peek_tok(l, t)) {
         l->cursor += t->len;
         l->buf = (Token){0};
         return true;
@@ -58,24 +54,18 @@ bool ksh_lexer_next_token(Lexer *l, Token *t)
     return false;
 }
 
-KshErr ksh_lexer_expect_next_token(Lexer *l, Token expected)
+static bool lex_next_tok_if_tok(Lexer *l, Token expected)
 {
     Token tok;
-    if (!ksh_lexer_next_token(l, &tok) ||
-        !strv_eq(tok, expected)) return KSH_ERR_TOKEN_EXPECTED;
-
-    return KSH_ERR_OK;
+    return lex_next_tok(l, &tok) &&
+           strv_eq(expected, tok);
 }
 
-static KshErr ksh_lexer_expect_next_token_pred(Lexer *l, bool (*predicate)(Token))
+static bool lex_next_tok_if_pred(Lexer *l, bool (*predicate)(Token))
 {
     Token tok;
-    if (
-        !ksh_lexer_next_token(l, &tok) ||
-        !predicate(tok)
-    ) return KSH_ERR_TOKEN_EXPECTED;
-
-    return KSH_ERR_OK;
+    return lex_next_tok(l, &tok) &&
+           predicate(tok);
 }
 
 
@@ -99,11 +89,13 @@ static bool isbound(int s)
 
 int test()
 {
-    Lexer lex = ksh_lexer_new(strv_from_str("Neque porro quisquam est qui dolorem ipsum quia dolor\t\rsit amet, consectetur, adipisci velit, msg='Hello, World'"));
+    Lexer lex = { 
+        .text = STRV_LIT("Neque porro quisquam est qui dolorem ipsum quia dolor\t\rsit amet, consectetur, adipisci velit, msg='Hello, World")
+    };
     
-    assert(ksh_lexer_expect_next_token(&lex, strv_from_str("Neque")) == KSH_ERR_OK);
-    assert(ksh_lexer_expect_next_token(&lex, strv_from_str("porro")) == KSH_ERR_OK);
-    assert(ksh_lexer_expect_next_token(&lex, strv_from_str("moon")) == KSH_ERR_TOKEN_EXPECTED);
+    assert(lex_next_tok_if_tok(&lex, strv_from_str("Neque")));
+    assert(lex_next_tok_if_tok(&lex, strv_from_str("porro")));
+    assert(lex_next_tok_if_tok(&lex, strv_from_str("moon")));
 
     return 0;
 }
