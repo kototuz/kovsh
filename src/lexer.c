@@ -5,7 +5,9 @@ static Lexer ksh_lexer_new(StrView sv);
 static bool ksh_lexer_peek_token(Lexer *l, Token *t);
 static bool ksh_lexer_next_token(Lexer *l, Token *t);
 static KshErr ksh_lexer_expect_next_token(Lexer *l, Token expected);
+static KshErr ksh_lexer_expect_next_token_pred(Lexer *l, bool (*predicate)(Token));
 
+static bool isstr(int s);
 static bool isend(int s);
 static bool isbound(int s);
 
@@ -32,12 +34,10 @@ bool ksh_lexer_peek_token(Lexer *l, Token *t)
         result.len = 0;
     }
 
-    if (result.items[0] == '"' || result.items[0] == '\'') {
+    if (isstr(result.items[0])) {
         int pairsymbol = result.items[0];
         while (result.items[++result.len] != pairsymbol)
             if (isend(result.items[result.len])) return false;
-        result.len++;
-    } else if (ispunct(result.items[0])) {
         result.len++;
     } else
         while (!isbound(result.items[++result.len]));
@@ -67,7 +67,23 @@ KshErr ksh_lexer_expect_next_token(Lexer *l, Token expected)
     return KSH_ERR_OK;
 }
 
+static KshErr ksh_lexer_expect_next_token_pred(Lexer *l, bool (*predicate)(Token))
+{
+    Token tok;
+    if (
+        !ksh_lexer_next_token(l, &tok) ||
+        !predicate(tok)
+    ) return KSH_ERR_TOKEN_EXPECTED;
 
+    return KSH_ERR_OK;
+}
+
+
+
+static bool isstr(int s)
+{
+    return s == '"' || s == '\'';
+}
 
 static bool isend(int s)
 {
@@ -77,7 +93,7 @@ static bool isend(int s)
 static bool isbound(int s)
 {
     return isspace(s) ||
-           ispunct(s) || // TODO: make a separate function
+           isstr(s)   ||
            isend(s);
 }
 

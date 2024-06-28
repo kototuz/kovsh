@@ -7,6 +7,8 @@ static KshArg *ksh_ctx_get_arg(KshContext *ctx, StrView name);
 static bool parse_str(StrView in, StrView *res);
 static bool parse_int(StrView in, int *res);
 
+static bool arg_predicate(Token tok);
+
 
 
 static const ParseFn parsemap[] = {
@@ -24,13 +26,11 @@ KshErr ksh_ctx_init_(KshContext *ctx, size_t size, KshArg arg_buf[size])
     Lexer *lex = ctx->lex;
 
     while (count < size && ksh_lexer_peek_token(lex, &result.name)) {
-        err = ksh_lexer_expect_next_token(lex, STRV_LIT("-"));
-        if (err != KSH_ERR_OK) return err;
-        err = ksh_lexer_expect_next_token(lex, STRV_LIT("-"));
+        err = ksh_lexer_expect_next_token_pred(lex, arg_predicate);
         if (err != KSH_ERR_OK) return err;
 
-        if (!ksh_lexer_next_token(lex, &result.name))
-            return KSH_ERR_TOKEN_EXPECTED;
+        result.name.items = &result.name.items[2];
+        result.name.len -= 2;
 
         if (
             !ksh_lexer_next_token(lex, &result.value) ||
@@ -98,4 +98,11 @@ static bool parse_int(StrView in, int *res)
 
     *res = result;
     return true;
+}
+
+static bool arg_predicate(Token tok)
+{
+    return tok.len > 2         &&
+           tok.items[0] == '-' &&
+           tok.items[1] == '-';
 }
