@@ -23,7 +23,7 @@ static const ParseFn parsemap[] = {
 KshErr ksh_ctx_init_(KshContext *ctx, size_t size, KshArg arg_buf[size])
 {
     size_t count = 0;
-    Lexer *lex = ctx->lex;
+    Lexer *lex = &ctx->lex;
 
     while (count < size && lex_peek(lex)) {
         if (lex_next_if_pred(lex, full_name_predicate)) {

@@ -31,7 +31,6 @@ KshErr ksh_parse(StrView sv)
     assert(commands.count);
 
     KshCommand *command;
-    KshContext context = {0};
     Lexer lex = { .text = sv };
 
     if (!lex_next(&lex)) return KSH_ERR_OK;
@@ -39,8 +38,7 @@ KshErr ksh_parse(StrView sv)
     command = get_cmd(lex.cur_tok);
     if (!command) return KSH_ERR_COMMAND_NOT_FOUND;
 
-    context.lex = &lex;
-    command->fn(context);
+    command->fn((KshContext){ .lex = lex });
     return KSH_ERR_OK;
 }
 

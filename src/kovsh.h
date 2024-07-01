@@ -44,7 +44,7 @@ typedef struct {
 } Lexer;
 
 typedef struct {
-    Lexer *lex;
+    Lexer lex;
     KshArg *args;
     size_t args_count;
 } KshContext;
