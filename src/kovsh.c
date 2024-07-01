@@ -56,34 +56,42 @@ static KshCommand *get_cmd(StrView name)
 }
 
 
+
 static int test(KshContext ctx)
 {
-    KshErr err = ksh_ctx_init(&ctx, 4);
+    bool f = false;
+    bool s = false;
+    bool t = false;
+    KshErr err = ksh_ctx_init(&ctx,
+        KSH_OPT(f, "First"),
+        KSH_OPT(s, "Second"),
+        KSH_OPT(t, "Third")
+    );
     if (err != KSH_ERR_OK) return err;
 
-    if (ksh_ctx_get_option(&ctx, STRV_LIT("f"))) puts("first");
-    if (ksh_ctx_get_option(&ctx, STRV_LIT("s"))) puts("second");
-    if (ksh_ctx_get_option(&ctx, STRV_LIT("t"))) puts("third");
-    if (ksh_ctx_get_option(&ctx, STRV_LIT("-"))) puts("dash");
+    if (f) puts("First");
+    if (s) puts("Second");
+    if (t) puts("Third");
 
     return 0;
 }
 
 static int print(KshContext ctx)
 {
-    KshErr err = ksh_ctx_init(&ctx, 2);
+    StrView m;
+    int n = 1;
+    bool inf = false;
+    KshErr err = ksh_ctx_init(&ctx,
+        KSH_PARAM(m, "Message"),
+        KSH_PARAM(n, "Count"),
+        KSH_OPT(inf, "Infinitly?")
+    );
     if (err != KSH_ERR_OK) return err;
 
-    StrView msg;
-    if (!ksh_ctx_get_param(&ctx, STRV_LIT("m"), KSH_PARAM_TYPE_STR, &msg))
-        return 1;
+    if (inf) for (;;) printf(STRV_FMT"\n", STRV_ARG(m));
 
-    int repeat;
-    if (!ksh_ctx_get_param(&ctx, STRV_LIT("n"), KSH_PARAM_TYPE_INT, &repeat))
-        repeat = 1;
-
-    for (int i = 0; i < repeat; i++)
-        printf(STRV_FMT"\n", STRV_ARG(msg));
+    for (int i = 0; i < n; i++)
+        printf(STRV_FMT"\n", STRV_ARG(m));
 
     return 0;
 }
@@ -91,8 +99,8 @@ static int print(KshContext ctx)
 int main()
 {
     ksh_use_commands(
-        { STRV_LIT("test"), test },
         { STRV_LIT("print"), print },
+        { STRV_LIT("test"), test }
     );
 
     char buf[100];
