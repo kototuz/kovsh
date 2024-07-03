@@ -59,9 +59,10 @@ typedef struct {
     Lexer lex;
     KshArgDef *arg_defs;
     size_t arg_defs_count;
+    const char *cmd_descr;
 } KshContext;
 
-typedef int (*KshCommandFn)(KshContext);
+typedef int (*KshCommandFn)(KshContext ctx, KshErr *parsing_err);
 
 typedef struct {
     StrView name;
@@ -81,9 +82,6 @@ typedef struct {
 
 void ksh_use_commands_(size_t size, KshCommand buf[size]);
 
-#define ksh_ctx_init(ctx, ...) \
-    ksh_ctx_init_((ctx), sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef), (KshArgDef[]){__VA_ARGS__})
-
 #define KSH_OPT(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_OPT, &(var) }
 
 #define KSH_PARAM(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), _Generic((var), \
@@ -91,6 +89,14 @@ void ksh_use_commands_(size_t size, KshCommand buf[size]);
     StrView: KSH_ARG_KIND_PARAM_STR,                                                \
     default: KSH_ARG_KIND_PARAM_STR), &(var) }                                      \
 
-KshErr ksh_ctx_init_(KshContext *ctx, size_t size, KshArgDef arg_def_buf[size]);
+#define KSH_INIT(descr, ...)                                                    \
+    ctx.cmd_descr = (descr);                                                    \
+    ctx.arg_defs = (KshArgDef[]){__VA_ARGS__};                                  \
+    ctx.arg_defs_count = sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef);  \
+    if (!ksh_parse_args(ctx, err)) return 0;                                    \
+
+#define KSH_CMD(name) int name(KshContext ctx, KshErr *err)
+
+bool ksh_parse_args(KshContext ctx, KshErr *parsing_err);
 
 #endif

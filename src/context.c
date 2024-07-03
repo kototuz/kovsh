@@ -22,50 +22,64 @@ static const ParseFn parsemap[] = {
 
 
 
-KshErr ksh_ctx_init_(KshContext *ctx, size_t size, KshArgDef arg_def_buf[size])
+bool ksh_parse_args(KshContext ctx, KshErr *parsing_err)
 {
-    Lexer *lex = &ctx->lex;
     KshArgDef *arg_def;
-
-    while (lex_peek(lex)) {
-        if (lex_next_if_pred(lex, full_name_predicate)) {
-            arg_def = get_arg_def(size, arg_def_buf, (StrView){
-                .items = &lex->cur_tok.items[2],
-                .len = lex->cur_tok.len-2
-            });
-        } else if (lex_next_if_pred(lex, short_name_predicate)) {
-            arg_def = get_arg_def(size, arg_def_buf, (StrView){
-                .items = &lex->cur_tok.items[1],
-                .len = 1,
-            });
-        } else if (lex_next_if_pred(lex, multiopt_predicate)) {
-            for (size_t i = 1; i < lex->cur_tok.len; i++) {
-                arg_def = get_arg_def(size, arg_def_buf, (StrView){
-                    .items = &lex->cur_tok.items[i],
+    StrView arg_name;
+    while (lex_peek(&ctx.lex)) {
+        if (lex_next_if_pred(&ctx.lex, full_name_predicate)) {
+            arg_name = (StrView){
+                .items = &ctx.lex.cur_tok.items[2],
+                .len = ctx.lex.cur_tok.len-2
+            };
+        } else if (lex_next_if_pred(&ctx.lex, short_name_predicate)) {
+            arg_name = (StrView){
+                .items = &ctx.lex.cur_tok.items[1],
+                .len = 1
+            };
+        } else if (lex_next_if_pred(&ctx.lex, multiopt_predicate)) {
+            for (size_t i = 1; i < ctx.lex.cur_tok.len; i++) {
+                arg_def = get_arg_def(ctx.arg_defs_count, ctx.arg_defs, (StrView){
+                    .items = &ctx.lex.cur_tok.items[i],
                     .len = 1
                 });
-                if (!arg_def) return KSH_ERR_ARG_NOT_FOUND;
+                if (!arg_def) {
+                    *parsing_err = KSH_ERR_ARG_NOT_FOUND;
+                    return false;
+                }
 
                 assert(arg_def->kind == KSH_ARG_KIND_OPT);
 
                 *((bool*)arg_def->dest) = true;
             }
             continue;
-        } else return KSH_ERR_TOKEN_EXPECTED;
+        } else {
+            *parsing_err = KSH_ERR_TOKEN_EXPECTED;
+            return false;
+        }
 
-        if (!arg_def) return KSH_ERR_ARG_NOT_FOUND;
+        arg_def = get_arg_def(ctx.arg_defs_count, ctx.arg_defs, arg_name);
+        if (!arg_def) {
+            *parsing_err = KSH_ERR_ARG_NOT_FOUND;
+            return false;
+        }
 
         if (IS_PARAM(arg_def->kind)) {
-            if (!lex_next_if_pred(lex, notarg_predicate))
-                return KSH_ERR_VALUE_EXPECTED;
-            if (!parsemap[arg_def->kind](lex->cur_tok, arg_def->dest))
-                return KSH_ERR_PARSING_FAILED;
+            if (!lex_next_if_pred(&ctx.lex, notarg_predicate)) {
+                *parsing_err = KSH_ERR_VALUE_EXPECTED;
+                return false;
+            }
+            if (!parsemap[arg_def->kind](ctx.lex.cur_tok, arg_def->dest)) {
+                *parsing_err = KSH_ERR_PARSING_FAILED;
+                return false;
+            }
         } else {
             *((bool*)arg_def->dest) = true;
         }
     }
 
-    return KSH_ERR_OK;
+    *parsing_err = KSH_ERR_OK;
+    return true;
 }
 
 
