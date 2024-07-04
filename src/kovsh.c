@@ -61,11 +61,17 @@ static KSH_CMD(print)
 {
     StrView m;
     int n = 1;
+    bool inf = false;
     KSH_INIT(
         "Prints messages",
         KSH_PARAM(m, "Message"),
         KSH_PARAM(n, "Count"),
+        KSH_OPT(inf, "Infinitly?")
     );
+
+    if (inf)
+        for (;;)
+            printf(STRV_FMT"\n", STRV_ARG(m));
 
     for (int i = 0; i < n; i++)
         printf(STRV_FMT"\n", STRV_ARG(m));
