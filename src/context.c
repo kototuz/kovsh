@@ -36,7 +36,7 @@ KshErr ksh_parse_args_(Lexer *l, KshArgDefs arg_defs)
             for (size_t i = 0; i < arg_name.data.len; i++) {
                 arg_def = get_arg_def(arg_defs, (StrView){ 1, &arg_name.data.items[i] });
                 if (!arg_def || arg_def->kind != KSH_ARG_KIND_OPT) return KSH_ERR_ARG_NOT_FOUND;
-                *((bool*)arg_def->dest) = true;
+                *((bool*)arg_def->data.as_ptr) = true;
             }
             continue;
         }
@@ -46,18 +46,21 @@ KshErr ksh_parse_args_(Lexer *l, KshArgDefs arg_defs)
 
         if (IS_PARAM(arg_def->kind)) {
             if (!lex_next(l)) return KSH_ERR_VALUE_EXPECTED;
-            if (!parsemap[arg_def->kind](l->cur_tok, arg_def->dest))
+            if (!parsemap[arg_def->kind](l->cur_tok, arg_def->data.as_ptr))
                 return KSH_ERR_PARSING_FAILED;
         } else if (arg_def->kind == KSH_ARG_KIND_OPT) {
-            *((bool*)arg_def->dest) = true;
+            *((bool*)arg_def->data.as_ptr) = true;
         } else if (arg_def->kind == KSH_ARG_KIND_HELP) {
-            printf("[descr]: %s\n", (char *)arg_def->dest);
+            printf("[descr]: %s\n", (char *)arg_def->data.as_ptr);
             for (size_t i = 0; i < arg_defs.count; i++) {
                 printf("  %2s%-15s%s\n",
                        arg_name_prefix(arg_defs.items[i].name),
                        arg_defs.items[i].name.items,
                        arg_defs.items[i].usage);
             }
+            return KSH_ERR_EARLY_EXIT;
+        } else if (arg_def->kind == KSH_ARG_KIND_SUBCMD) {
+            arg_def->data.as_fn(l);
             return KSH_ERR_EARLY_EXIT;
         }
     }
@@ -69,9 +72,9 @@ KshErr ksh_parse_args_(Lexer *l, KshArgDefs arg_defs)
 
 static bool arg_name_from_tok(Token tok, ArgName *res)
 {
-    if (tok.items[0] != '-') return false;
-
-    if (tok.items[1] == '-') {
+    if (tok.items[0] != '-') {
+        *res = (ArgName){ .data = tok };
+    } else if (tok.items[1] == '-') {
         if (tok.len <= 3) return false;
         *res = (ArgName){
             .data.items = &tok.items[2],

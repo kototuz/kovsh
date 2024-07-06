@@ -39,21 +39,10 @@ typedef enum {
     KSH_ARG_KIND_OPT,
     KSH_ARG_KIND_PARAM_STR,
     KSH_ARG_KIND_PARAM_INT,
-    KSH_ARG_KIND_HELP
+    KSH_ARG_KIND_HELP,
+    KSH_ARG_KIND_SUBCMD
 } KshArgKind;
 #define IS_PARAM(kind) (kind > KSH_ARG_KIND_OPT && kind <= KSH_ARG_KIND_PARAM_INT)
-
-typedef struct {
-    StrView name;
-    const char *usage;
-    KshArgKind kind;
-    void *dest;
-} KshArgDef;
-
-typedef struct {
-    KshArgDef *items;
-    size_t count;
-} KshArgDefs;
 
 typedef struct {
     StrView text;
@@ -62,12 +51,28 @@ typedef struct {
     bool is_peek;
 } Lexer;
 
+typedef int (*KshCommandFn)(Lexer *l);
+
+typedef struct {
+    StrView name;
+    const char *usage;
+    KshArgKind kind;
+    union {
+        void *as_ptr;
+        KshCommandFn as_fn;
+    } data;
+} KshArgDef;
+
+typedef struct {
+    KshArgDef *items;
+    size_t count;
+} KshArgDefs;
+
 typedef struct {
     Lexer lex;
     KshArgDefs arg_defs;
 } KshContext;
 
-typedef int (*KshCommandFn)(Lexer *l);
 
 typedef struct {
     StrView name;
@@ -87,14 +92,16 @@ typedef struct {
 
 void ksh_use_commands_(size_t size, KshCommand buf[size]);
 
-#define KSH_OPT(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_OPT, &(var) }
+#define KSH_OPT(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_OPT, .data.as_ptr = &(var) }
 
 #define KSH_PARAM(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), _Generic((var), \
     int: KSH_ARG_KIND_PARAM_INT,                                                    \
     StrView: KSH_ARG_KIND_PARAM_STR,                                                \
-    default: KSH_ARG_KIND_PARAM_STR), &(var) }                                      \
+    default: KSH_ARG_KIND_PARAM_STR), .data.as_ptr = &(var) }                       \
 
-#define KSH_HELP(help) (KshArgDef){ STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, (help) }
+#define KSH_HELP(help) (KshArgDef){ STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, .data.as_ptr = (help) }
+
+#define KSH_SUBCMD(fn, usage) (KshArgDef){ STRV_LIT(#fn), (usage), KSH_ARG_KIND_SUBCMD, .data.as_fn = (fn) }
 
 #define ksh_parse_args(lex, ...) \
     ksh_parse_args_((lex), (KshArgDefs){ (KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef) })

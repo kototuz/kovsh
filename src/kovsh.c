@@ -57,12 +57,26 @@ static KshCommand *get_cmd(StrView name)
 
 
 
+static int dec(Lexer *args)
+{
+    StrView m;
+    KshErr err = ksh_parse_args(args,
+        KSH_PARAM(m, "message")
+    );
+    if (err != 0) return 1;
+
+    printf("<["STRV_FMT"]>\n", STRV_ARG(m));
+    
+    return 0;
+}
+
 static int print(Lexer *args)
 {
     StrView m;
     KshErr err = ksh_parse_args(args,
         KSH_HELP("prints your amazing messages"),
-        KSH_PARAM(m, "message")
+        KSH_PARAM(m, "message"),
+        KSH_SUBCMD(dec, "print decorativly")
     );
     if (err != 0) return 1;
 
