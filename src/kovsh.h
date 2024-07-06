@@ -84,14 +84,6 @@ typedef struct {
     size_t count;
 } KshCommands;
 
-#define ksh_use_commands(...) \
-    ksh_use_commands_( \
-        sizeof((KshCommand[]){__VA_ARGS__})/sizeof(KshCommand), \
-        (KshCommand[]){__VA_ARGS__} \
-    ) \
-
-void ksh_use_commands_(size_t size, KshCommand buf[size]);
-
 #define KSH_OPT(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_OPT, .data.as_ptr = &(var) }
 
 #define KSH_PARAM(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), _Generic((var), \
@@ -107,5 +99,6 @@ void ksh_use_commands_(size_t size, KshCommand buf[size]);
     ksh_parse_args_((lex), (KshArgDefs){ (KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef) })
 
 KshErr ksh_parse_args_(Lexer *l, KshArgDefs arg_defs);
+KshErr ksh_parse_cmd(StrView input, KshCommandFn root);
 
 #endif

@@ -24,6 +24,12 @@ static const ParseFn parsemap[] = {
 
 
 
+KshErr ksh_parse_cmd(StrView input, KshCommandFn root)
+{
+    root(&(Lexer){ .text = input });
+    return KSH_ERR_OK;
+}
+
 KshErr ksh_parse_args_(Lexer *l, KshArgDefs arg_defs)
 {
     KshArgDef *arg_def;
