@@ -18,7 +18,8 @@ typedef enum {
     KSH_ERR_TOKEN_EXPECTED,
     KSH_ERR_ARG_NOT_FOUND,
     KSH_ERR_VALUE_EXPECTED,
-    KSH_ERR_PARSING_FAILED
+    KSH_ERR_PARSING_FAILED,
+    KSH_ERR_EARLY_EXIT,
 } KshErr;
 
 const char *ksh_err_str(KshErr err);
@@ -66,7 +67,7 @@ typedef struct {
     KshArgDefs arg_defs;
 } KshContext;
 
-typedef int (*KshCommandFn)(KshContext ctx, KshErr *parsing_err);
+typedef int (*KshCommandFn)(Lexer *l);
 
 typedef struct {
     StrView name;
@@ -95,12 +96,9 @@ void ksh_use_commands_(size_t size, KshCommand buf[size]);
 
 #define KSH_HELP(help) (KshArgDef){ STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, (help) }
 
-#define KSH_INIT(...)                                                                                        \
-    ctx.arg_defs = (KshArgDefs){(KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef)}; \
-    if (!ksh_parse_args(ctx, err)) return 0;                                                                 \
+#define ksh_parse_args(lex, ...) \
+    ksh_parse_args_((lex), (KshArgDefs){ (KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef) })
 
-#define KSH_CMD(name) int name(KshContext ctx, KshErr *err)
-
-bool ksh_parse_args(KshContext ctx, KshErr *parsing_err);
+KshErr ksh_parse_args_(Lexer *l, KshArgDefs arg_defs);
 
 #endif

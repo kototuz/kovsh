@@ -38,9 +38,8 @@ KshErr ksh_parse(StrView sv)
     command = get_cmd(lex.cur_tok);
     if (!command) return KSH_ERR_COMMAND_NOT_FOUND;
 
-    KshErr err;
-    command->fn((KshContext){ .lex = lex }, &err);
-    return err;
+    command->fn(&lex);
+    return KSH_ERR_OK;
 }
 
 
@@ -57,24 +56,17 @@ static KshCommand *get_cmd(StrView name)
 }
 
 
-static KSH_CMD(print)
+
+static int print(Lexer *args)
 {
     StrView m;
-    int n = 1;
-    bool inf = false;
-    KSH_INIT(
-        KSH_HELP("Prints your amazing messages"),
-        KSH_PARAM(m, "Message"),
-        KSH_PARAM(n, "Count"),
-        KSH_OPT(inf, "Infinitly?")
+    KshErr err = ksh_parse_args(args,
+        KSH_HELP("prints your amazing messages"),
+        KSH_PARAM(m, "message")
     );
+    if (err != 0) return 1;
 
-    if (inf)
-        for (;;)
-            printf(STRV_FMT"\n", STRV_ARG(m));
-
-    for (int i = 0; i < n; i++)
-        printf(STRV_FMT"\n", STRV_ARG(m));
+    printf(STRV_FMT"\n", STRV_ARG(m));
 
     return 0;
 }

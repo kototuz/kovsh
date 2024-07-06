@@ -1,19 +1,19 @@
 
 typedef bool (*ParseFn)(StrView in, void *res);
 
+typedef struct {
+    StrView data;
+    bool is_multiopt;
+} ArgName;
 
 
+
+static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name);
+static bool arg_name_from_tok(Token tok, ArgName *res);
 static const char *arg_name_prefix(StrView name);
 
 static bool parse_str(StrView in, StrView *res);
 static bool parse_int(StrView in, int *res);
-
-static bool full_name_predicate(Token tok);
-static bool short_name_predicate(Token tok);
-static bool multiopt_predicate(Token tok);
-static bool notarg_predicate(Token tok);
-
-static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name);
 
 
 
@@ -24,75 +24,74 @@ static const ParseFn parsemap[] = {
 
 
 
-bool ksh_parse_args(KshContext ctx, KshErr *parsing_err)
+KshErr ksh_parse_args_(Lexer *l, KshArgDefs arg_defs)
 {
     KshArgDef *arg_def;
-    StrView arg_name;
-    while (lex_peek(&ctx.lex)) {
-        if (lex_next_if_pred(&ctx.lex, full_name_predicate)) {
-            arg_name = (StrView){
-                .items = &ctx.lex.cur_tok.items[2],
-                .len = ctx.lex.cur_tok.len-2
-            };
-        } else if (lex_next_if_pred(&ctx.lex, short_name_predicate)) {
-            arg_name = (StrView){
-                .items = &ctx.lex.cur_tok.items[1],
-                .len = 1
-            };
-        } else if (lex_next_if_pred(&ctx.lex, multiopt_predicate)) {
-            for (size_t i = 1; i < ctx.lex.cur_tok.len; i++) {
-                arg_def = get_arg_def(ctx.arg_defs, (StrView){
-                    .items = &ctx.lex.cur_tok.items[i],
-                    .len = 1
-                });
-                if (!arg_def) {
-                    *parsing_err = KSH_ERR_ARG_NOT_FOUND;
-                    return false;
-                }
+    ArgName arg_name;
 
-                assert(arg_def->kind == KSH_ARG_KIND_OPT);
+    while (lex_next(l)) {
+        if (!arg_name_from_tok(l->cur_tok, &arg_name)) return KSH_ERR_TOKEN_EXPECTED;
 
+        if (arg_name.is_multiopt) {
+            for (size_t i = 0; i < arg_name.data.len; i++) {
+                arg_def = get_arg_def(arg_defs, (StrView){ 1, &arg_name.data.items[i] });
+                if (!arg_def || arg_def->kind != KSH_ARG_KIND_OPT) return KSH_ERR_ARG_NOT_FOUND;
                 *((bool*)arg_def->dest) = true;
             }
             continue;
-        } else {
-            *parsing_err = KSH_ERR_TOKEN_EXPECTED;
-            return false;
         }
 
-        arg_def = get_arg_def(ctx.arg_defs, arg_name);
-        if (!arg_def) {
-            *parsing_err = KSH_ERR_ARG_NOT_FOUND;
-            return false;
-        }
+        arg_def = get_arg_def(arg_defs, arg_name.data);
+        if (!arg_def) return KSH_ERR_ARG_NOT_FOUND;
 
         if (IS_PARAM(arg_def->kind)) {
-            if (!lex_next_if_pred(&ctx.lex, notarg_predicate)) {
-                *parsing_err = KSH_ERR_VALUE_EXPECTED;
-                return false;
-            }
-            if (!parsemap[arg_def->kind](ctx.lex.cur_tok, arg_def->dest)) {
-                *parsing_err = KSH_ERR_PARSING_FAILED;
-                return false;
-            }
+            if (!lex_next(l)) return KSH_ERR_VALUE_EXPECTED;
+            if (!parsemap[arg_def->kind](l->cur_tok, arg_def->dest))
+                return KSH_ERR_PARSING_FAILED;
         } else if (arg_def->kind == KSH_ARG_KIND_OPT) {
             *((bool*)arg_def->dest) = true;
         } else if (arg_def->kind == KSH_ARG_KIND_HELP) {
             printf("[descr]: %s\n", (char *)arg_def->dest);
-            for (size_t i = 0; i < ctx.arg_defs.count; i++) {
+            for (size_t i = 0; i < arg_defs.count; i++) {
                 printf("  %2s%-15s%s\n",
-                       arg_name_prefix(ctx.arg_defs.items[i].name),
-                       ctx.arg_defs.items[i].name.items,
-                       ctx.arg_defs.items[i].usage);
+                       arg_name_prefix(arg_defs.items[i].name),
+                       arg_defs.items[i].name.items,
+                       arg_defs.items[i].usage);
             }
+            return KSH_ERR_EARLY_EXIT;
         }
     }
 
-    *parsing_err = KSH_ERR_OK;
-    return true;
+    return KSH_ERR_OK;
 }
 
 
+
+static bool arg_name_from_tok(Token tok, ArgName *res)
+{
+    if (tok.items[0] != '-') return false;
+
+    if (tok.items[1] == '-') {
+        if (tok.len <= 3) return false;
+        *res = (ArgName){
+            .data.items = &tok.items[2],
+            .data.len = tok.len-2
+        };
+    } else if (tok.len > 2) {
+        *res = (ArgName){
+            .data.items = &tok.items[1],
+            .data.len = tok.len-1,
+            .is_multiopt = true
+        };
+    } else if (tok.len == 2) {
+        *res = (ArgName){
+            .data.items = &tok.items[1],
+            .data.len = 1,
+        };
+    } else return false;
+
+    return true;
+}
 
 static const char *arg_name_prefix(StrView name)
 {
@@ -131,28 +130,4 @@ static bool parse_int(StrView in, int *res)
 
     *res = result;
     return true;
-}
-
-static bool full_name_predicate(Token tok)
-{
-    return tok.len > 3         &&
-           tok.items[0] == '-' &&
-           tok.items[1] == '-';
-}
-
-static bool short_name_predicate(Token tok)
-{
-    return tok.len == 2 && tok.items[0] == '-';
-}
-
-static bool multiopt_predicate(Token tok)
-{
-    return tok.len > 2         &&
-           tok.items[0] == '-' &&
-           tok.items[1] != '-';
-}
-
-static bool notarg_predicate(Token tok)
-{
-    return tok.items[0] != '-';
 }
