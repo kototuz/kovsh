@@ -63,7 +63,7 @@ static KSH_CMD(print)
     int n = 1;
     bool inf = false;
     KSH_INIT(
-        "Prints messages",
+        KSH_HELP("Prints your amazing messages"),
         KSH_PARAM(m, "Message"),
         KSH_PARAM(n, "Count"),
         KSH_OPT(inf, "Infinitly?")

@@ -3,7 +3,6 @@ typedef bool (*ParseFn)(StrView in, void *res);
 
 
 
-static void print_help(KshContext *ctx);
 static const char *arg_name_prefix(StrView name);
 
 static bool parse_str(StrView in, StrView *res);
@@ -61,11 +60,6 @@ bool ksh_parse_args(KshContext ctx, KshErr *parsing_err)
             return false;
         }
 
-        if (strv_eq(arg_name, STRV_LIT("help"))) {
-            print_help(&ctx);
-            return false;
-        }
-
         arg_def = get_arg_def(ctx.arg_defs_count, ctx.arg_defs, arg_name);
         if (!arg_def) {
             *parsing_err = KSH_ERR_ARG_NOT_FOUND;
@@ -81,8 +75,16 @@ bool ksh_parse_args(KshContext ctx, KshErr *parsing_err)
                 *parsing_err = KSH_ERR_PARSING_FAILED;
                 return false;
             }
-        } else {
+        } else if (arg_def->kind == KSH_ARG_KIND_OPT) {
             *((bool*)arg_def->dest) = true;
+        } else if (arg_def->kind == KSH_ARG_KIND_HELP) {
+            printf("[descr]: %s\n", (char *)arg_def->dest);
+            for (size_t i = 0; i < ctx.arg_defs_count; i++) {
+                printf("  %2s%-15s%s\n",
+                       arg_name_prefix(ctx.arg_defs[i].name),
+                       ctx.arg_defs[i].name.items,
+                       ctx.arg_defs[i].usage);
+            }
         }
     }
 
@@ -91,40 +93,6 @@ bool ksh_parse_args(KshContext ctx, KshErr *parsing_err)
 }
 
 
-
-static void print_help(KshContext *ctx)
-{
-    KshArgDef *defs = ctx->arg_defs;
-    size_t defs_count = ctx->arg_defs_count;
-    size_t i;
-
-    puts("[description]");
-    printf("  %s\n", ctx->cmd_descr);
-
-    printf("\n");
-
-    puts("[parameters]");
-    for (i = 0; i < defs_count; i++) {
-        if (!IS_PARAM(defs[i].kind)) continue;
-        printf("%2s%-15s%s\n",
-               arg_name_prefix(defs[i].name),
-               defs[i].name.items,
-               defs[i].usage);
-    }
-
-    printf("\n");
-
-    puts("[options]");
-    for (i = 0; i < defs_count; i++) {
-        if (!defs[i].kind == KSH_ARG_KIND_OPT) continue;
-        printf("%2s%-15s%s\n",
-               arg_name_prefix(defs[i].name),
-               defs[i].name.items,
-               defs[i].usage);
-    }
-
-    printf("\n");
-}
 
 static const char *arg_name_prefix(StrView name)
 {

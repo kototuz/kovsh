@@ -37,7 +37,8 @@ bool    strv_eq(StrView sv1, StrView sv2);
 typedef enum {
     KSH_ARG_KIND_OPT,
     KSH_ARG_KIND_PARAM_STR,
-    KSH_ARG_KIND_PARAM_INT
+    KSH_ARG_KIND_PARAM_INT,
+    KSH_ARG_KIND_HELP
 } KshArgKind;
 #define IS_PARAM(kind) (kind > KSH_ARG_KIND_OPT && kind <= KSH_ARG_KIND_PARAM_INT)
 
@@ -59,7 +60,6 @@ typedef struct {
     Lexer lex;
     KshArgDef *arg_defs;
     size_t arg_defs_count;
-    const char *cmd_descr;
 } KshContext;
 
 typedef int (*KshCommandFn)(KshContext ctx, KshErr *parsing_err);
@@ -89,8 +89,9 @@ void ksh_use_commands_(size_t size, KshCommand buf[size]);
     StrView: KSH_ARG_KIND_PARAM_STR,                                                \
     default: KSH_ARG_KIND_PARAM_STR), &(var) }                                      \
 
-#define KSH_INIT(descr, ...)                                                    \
-    ctx.cmd_descr = (descr);                                                    \
+#define KSH_HELP(help) (KshArgDef){ STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, (help) }
+
+#define KSH_INIT(...)                                                           \
     ctx.arg_defs = (KshArgDef[]){__VA_ARGS__};                                  \
     ctx.arg_defs_count = sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef);  \
     if (!ksh_parse_args(ctx, err)) return 0;                                    \
