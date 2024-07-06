@@ -13,7 +13,7 @@ static bool short_name_predicate(Token tok);
 static bool multiopt_predicate(Token tok);
 static bool notarg_predicate(Token tok);
 
-static KshArgDef *get_arg_def(size_t count, KshArgDef items[count], StrView name);
+static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name);
 
 
 
@@ -41,7 +41,7 @@ bool ksh_parse_args(KshContext ctx, KshErr *parsing_err)
             };
         } else if (lex_next_if_pred(&ctx.lex, multiopt_predicate)) {
             for (size_t i = 1; i < ctx.lex.cur_tok.len; i++) {
-                arg_def = get_arg_def(ctx.arg_defs_count, ctx.arg_defs, (StrView){
+                arg_def = get_arg_def(ctx.arg_defs, (StrView){
                     .items = &ctx.lex.cur_tok.items[i],
                     .len = 1
                 });
@@ -60,7 +60,7 @@ bool ksh_parse_args(KshContext ctx, KshErr *parsing_err)
             return false;
         }
 
-        arg_def = get_arg_def(ctx.arg_defs_count, ctx.arg_defs, arg_name);
+        arg_def = get_arg_def(ctx.arg_defs, arg_name);
         if (!arg_def) {
             *parsing_err = KSH_ERR_ARG_NOT_FOUND;
             return false;
@@ -79,11 +79,11 @@ bool ksh_parse_args(KshContext ctx, KshErr *parsing_err)
             *((bool*)arg_def->dest) = true;
         } else if (arg_def->kind == KSH_ARG_KIND_HELP) {
             printf("[descr]: %s\n", (char *)arg_def->dest);
-            for (size_t i = 0; i < ctx.arg_defs_count; i++) {
+            for (size_t i = 0; i < ctx.arg_defs.count; i++) {
                 printf("  %2s%-15s%s\n",
-                       arg_name_prefix(ctx.arg_defs[i].name),
-                       ctx.arg_defs[i].name.items,
-                       ctx.arg_defs[i].usage);
+                       arg_name_prefix(ctx.arg_defs.items[i].name),
+                       ctx.arg_defs.items[i].name.items,
+                       ctx.arg_defs.items[i].usage);
             }
         }
     }
@@ -99,11 +99,11 @@ static const char *arg_name_prefix(StrView name)
     return name.len > 1 ? "--" : "-";
 }
 
-static KshArgDef *get_arg_def(size_t count, KshArgDef items[count], StrView name)
+static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name)
 {
-    for (size_t i = 0; i < count; i++) {
-        if (strv_eq(name, items[i].name)) {
-            return &items[i];
+    for (size_t i = 0; i < arg_defs.count; i++) {
+        if (strv_eq(name, arg_defs.items[i].name)) {
+            return &arg_defs.items[i];
         }
     }
 

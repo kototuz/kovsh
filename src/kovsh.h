@@ -50,6 +50,11 @@ typedef struct {
 } KshArgDef;
 
 typedef struct {
+    KshArgDef *items;
+    size_t count;
+} KshArgDefs;
+
+typedef struct {
     StrView text;
     size_t cursor;
     Token cur_tok;
@@ -58,8 +63,7 @@ typedef struct {
 
 typedef struct {
     Lexer lex;
-    KshArgDef *arg_defs;
-    size_t arg_defs_count;
+    KshArgDefs arg_defs;
 } KshContext;
 
 typedef int (*KshCommandFn)(KshContext ctx, KshErr *parsing_err);
@@ -91,10 +95,9 @@ void ksh_use_commands_(size_t size, KshCommand buf[size]);
 
 #define KSH_HELP(help) (KshArgDef){ STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, (help) }
 
-#define KSH_INIT(...)                                                           \
-    ctx.arg_defs = (KshArgDef[]){__VA_ARGS__};                                  \
-    ctx.arg_defs_count = sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef);  \
-    if (!ksh_parse_args(ctx, err)) return 0;                                    \
+#define KSH_INIT(...)                                                                                        \
+    ctx.arg_defs = (KshArgDefs){(KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef)}; \
+    if (!ksh_parse_args(ctx, err)) return 0;                                                                 \
 
 #define KSH_CMD(name) int name(KshContext ctx, KshErr *err)
 
