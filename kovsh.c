@@ -1,3 +1,7 @@
+#include "kovsh.h"
+
+#include <string.h>
+#include <ctype.h>
 
 typedef bool (*ParseFn)(StrView in, void *res);
 
@@ -7,6 +11,15 @@ typedef struct {
 } ArgName;
 
 
+
+static bool lex_peek(Lexer *l);
+static bool lex_next(Lexer *l);
+static bool lex_next_if(Lexer *l, Token expected);
+static bool lex_next_if_pred(Lexer *l, bool (*predicate)(Token));
+
+static bool isstr(int s);
+static bool isend(int s);
+static bool isbound(int s);
 
 static void print_arg_help(KshArgDef arg);
 static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name);
@@ -24,10 +37,29 @@ static const ParseFn parsemap[] = {
 
 
 
-bool ksh_parse_cmd(StrView input, KshCommandFn root)
+StrView strv_new(const char *data, size_t data_len)
 {
-    root(&(KshArgParser){ .lex = (Lexer){ .text = input } });
-    return true;
+    assert(strlen(data) >= data_len);
+    return (StrView){ .items = data, .len = data_len };
+}
+
+StrView strv_from_str(const char *data)
+{
+    return (StrView){ .items = data, .len = strlen(data) };
+}
+
+bool strv_eq(StrView sv1, StrView sv2)
+{
+    return sv1.len == sv2.len &&
+           (memcmp(sv1.items, sv2.items, sv1.len) == 0);
+}
+
+
+
+int ksh_parser_parse_cmd(KshArgParser *parser, KshCommandFn root, StrView input)
+{
+    parser->lex.text = input;
+    return root(parser);
 }
 
 bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
@@ -99,6 +131,83 @@ bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
 }
 
 
+
+static bool lex_peek(Lexer *l)
+{
+    if (l->is_peek) return true;
+
+    Token result = { .items = &l->text.items[l->cursor] };
+
+    if (isend(result.items[0])) return false;
+
+    if (isspace(result.items[0])) {
+        while (isspace(result.items[++result.len]));
+        l->cursor += result.len;
+        result.items = &result.items[result.len];
+        result.len = 0;
+    }
+
+    if (isstr(result.items[0])) {
+        int pairsymbol = result.items[0];
+        while (result.items[++result.len] != pairsymbol)
+            if (isend(result.items[result.len])) return false;
+        result.len++;
+    } else
+        while (!isbound(result.items[++result.len]));
+
+    l->is_peek = true;
+    l->cur_tok = result;
+    return true;
+}
+
+static bool lex_next(Lexer *l)
+{
+    if (l->is_peek) {
+        l->cursor += l->cur_tok.len;
+        l->is_peek = false;
+        return true;
+    }
+
+    l->cur_tok = (Token){0};
+    if (lex_peek(l)) {
+        l->cursor += l->cur_tok.len;
+        l->is_peek = false;
+        return true;
+    }
+
+    return false;
+}
+
+static bool lex_next_if(Lexer *l, Token expected)
+{
+    return lex_peek(l)                   &&
+           strv_eq(l->cur_tok, expected) &&
+           lex_next(l);
+}
+
+static bool lex_next_if_pred(Lexer *l, bool (*predicate)(Token))
+{
+    return lex_peek(l)           &&
+           predicate(l->cur_tok) &&
+           lex_next(l);
+}
+
+static bool isstr(int s)
+{
+    return s == '"' || s == '\'';
+}
+
+static bool isend(int s)
+{
+    return s == '\0' || s == '\n';
+}
+
+static bool isbound(int s)
+{
+    return isspace(s) ||
+           isstr(s)   ||
+           isend(s);
+}
 
 static void print_arg_help(KshArgDef arg)
 {

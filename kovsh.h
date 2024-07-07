@@ -106,6 +106,6 @@ typedef struct {
     ksh_parser_parse_args_((par), (KshArgDefs){ (KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef) })
 
 bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs);
-bool ksh_parse_cmd(StrView input, KshCommandFn root);
+int  ksh_parser_parse_cmd(KshArgParser *parser, KshCommandFn root, StrView input);
 
 #endif
