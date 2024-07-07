@@ -58,7 +58,7 @@ bool strv_eq(StrView sv1, StrView sv2)
 
 int ksh_parser_parse_cmd(KshArgParser *parser, KshCommandFn root, StrView input)
 {
-    parser->lex.text = input;
+    parser->lex = (Lexer){ .text = input };
     return root(parser);
 }
 
