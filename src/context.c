@@ -8,9 +8,9 @@ typedef struct {
 
 
 
+static void print_arg_help(KshArgDef arg);
 static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name);
 static bool arg_name_from_tok(Token tok, ArgName *res);
-static const char *arg_name_prefix(StrView name);
 
 static bool parse_str(StrView in, StrView *res);
 static bool parse_int(StrView in, int *res);
@@ -24,57 +24,90 @@ static const ParseFn parsemap[] = {
 
 
 
-KshErr ksh_parse_cmd(StrView input, KshCommandFn root)
+bool ksh_parse_cmd(StrView input, KshCommandFn root)
 {
-    root(&(Lexer){ .text = input });
-    return KSH_ERR_OK;
+    root(&(KshArgParser){ .lex = (Lexer){ .text = input } });
+    return true;
 }
 
-KshErr ksh_parse_args_(Lexer *l, KshArgDefs arg_defs)
+bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
 {
     KshArgDef *arg_def;
     ArgName arg_name;
 
-    while (lex_next(l)) {
-        if (!arg_name_from_tok(l->cur_tok, &arg_name)) return KSH_ERR_TOKEN_EXPECTED;
+    while (lex_next(&parser->lex)) {
+        if (!arg_name_from_tok(parser->lex.cur_tok, &arg_name)) {
+            sprintf(parser->err_msg,
+                    "arg name was expected but found `"STRV_FMT"`\n",
+                    STRV_ARG(parser->lex.cur_tok));
+            return false;
+        }
 
         if (arg_name.is_multiopt) {
             for (size_t i = 0; i < arg_name.data.len; i++) {
                 arg_def = get_arg_def(arg_defs, (StrView){ 1, &arg_name.data.items[i] });
-                if (!arg_def || arg_def->kind != KSH_ARG_KIND_OPT) return KSH_ERR_ARG_NOT_FOUND;
+                if (!arg_def || arg_def->kind != KSH_ARG_KIND_OPT) {
+                    sprintf(parser->err_msg,
+                            "arg `%c` not found\n",
+                            arg_name.data.items[i]);
+                    return false;
+                }
                 *((bool*)arg_def->data.as_ptr) = true;
             }
             continue;
         }
 
         arg_def = get_arg_def(arg_defs, arg_name.data);
-        if (!arg_def) return KSH_ERR_ARG_NOT_FOUND;
+        if (!arg_def) {
+            sprintf(parser->err_msg,
+                    "arg `"STRV_FMT"` not found\n",
+                    STRV_ARG(arg_name.data));
+            return false;
+        }
 
         if (IS_PARAM(arg_def->kind)) {
-            if (!lex_next(l)) return KSH_ERR_VALUE_EXPECTED;
-            if (!parsemap[arg_def->kind](l->cur_tok, arg_def->data.as_ptr))
-                return KSH_ERR_PARSING_FAILED;
+            if (!lex_next(&parser->lex)) {
+                sprintf(parser->err_msg,
+                        "arg `"STRV_FMT"` requires value\n",
+                        STRV_ARG(arg_name.data));
+                return false;
+            }
+            if (!parsemap[arg_def->kind](parser->lex.cur_tok, arg_def->data.as_ptr)) {
+                sprintf(parser->err_msg,
+                        "value `"STRV_FMT"` is not valid\n",
+                        STRV_ARG(parser->lex.cur_tok));
+                return false;
+            }
         } else if (arg_def->kind == KSH_ARG_KIND_OPT) {
             *((bool*)arg_def->data.as_ptr) = true;
         } else if (arg_def->kind == KSH_ARG_KIND_HELP) {
             printf("[descr]: %s\n", (char *)arg_def->data.as_ptr);
             for (size_t i = 0; i < arg_defs.count; i++) {
-                printf("  %2s%-15s%s\n",
-                       arg_name_prefix(arg_defs.items[i].name),
-                       arg_defs.items[i].name.items,
-                       arg_defs.items[i].usage);
+                print_arg_help(arg_defs.items[i]);
+                puts("");
             }
-            return KSH_ERR_EARLY_EXIT;
+            parser->err_code = KSH_ERR_EARLY_EXIT;
+            return false;
         } else if (arg_def->kind == KSH_ARG_KIND_SUBCMD) {
-            arg_def->data.as_fn(l);
-            return KSH_ERR_EARLY_EXIT;
+            arg_def->data.as_fn(parser);
+            parser->err_code = KSH_ERR_EARLY_EXIT;
+            return false;
         }
     }
 
-    return KSH_ERR_OK;
+    return true;
 }
 
 
+
+static void print_arg_help(KshArgDef arg)
+{
+    if (IS_PARAM(arg.kind) || arg.kind == KSH_ARG_KIND_OPT) {
+        printf(arg.name.len > 2 ? "--" : " -");
+    } else printf("  ");
+
+    printf("%-15s%s", arg.name.items, arg.usage);
+}
 
 static bool arg_name_from_tok(Token tok, ArgName *res)
 {
@@ -100,11 +133,6 @@ static bool arg_name_from_tok(Token tok, ArgName *res)
     } else return false;
 
     return true;
-}
-
-static const char *arg_name_prefix(StrView name)
-{
-    return name.len > 1 ? "--" : "-";
 }
 
 static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name)

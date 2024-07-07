@@ -51,7 +51,15 @@ typedef struct {
     bool is_peek;
 } Lexer;
 
-typedef int (*KshCommandFn)(Lexer *l);
+#define MAX_ERR_MSG 100
+typedef struct {
+    Lexer lex;
+    KshErr err_code;
+    char err_msg[MAX_ERR_MSG];
+    int exit_code;
+} KshArgParser;
+
+typedef int (*KshCommandFn)(KshArgParser *parser);
 
 typedef struct {
     StrView name;
@@ -72,7 +80,6 @@ typedef struct {
     Lexer lex;
     KshArgDefs arg_defs;
 } KshContext;
-
 
 typedef struct {
     StrView name;
@@ -95,10 +102,10 @@ typedef struct {
 
 #define KSH_SUBCMD(fn, usage) (KshArgDef){ STRV_LIT(#fn), (usage), KSH_ARG_KIND_SUBCMD, .data.as_fn = (fn) }
 
-#define ksh_parse_args(lex, ...) \
-    ksh_parse_args_((lex), (KshArgDefs){ (KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef) })
+#define ksh_parser_parse_args(par, ...) \
+    ksh_parser_parse_args_((par), (KshArgDefs){ (KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef) })
 
-KshErr ksh_parse_args_(Lexer *l, KshArgDefs arg_defs);
-KshErr ksh_parse_cmd(StrView input, KshCommandFn root);
+bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs);
+bool ksh_parse_cmd(StrView input, KshCommandFn root);
 
 #endif
