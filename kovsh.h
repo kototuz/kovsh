@@ -22,8 +22,6 @@ typedef enum {
     KSH_ERR_EARLY_EXIT,
 } KshErr;
 
-const char *ksh_err_str(KshErr err);
-
 typedef struct {
     size_t len;
     const char *items;
@@ -75,21 +73,6 @@ typedef struct {
     KshArgDef *items;
     size_t count;
 } KshArgDefs;
-
-typedef struct {
-    Lexer lex;
-    KshArgDefs arg_defs;
-} KshContext;
-
-typedef struct {
-    StrView name;
-    KshCommandFn fn;
-} KshCommand;
-
-typedef struct {
-    KshCommand *items;
-    size_t count;
-} KshCommands;
 
 #define KSH_OPT(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_OPT, .data.as_ptr = &(var) }
 
