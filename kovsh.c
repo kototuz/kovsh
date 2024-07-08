@@ -58,6 +58,7 @@ bool strv_eq(StrView sv1, StrView sv2)
 
 int ksh_parser_parse_cmd(KshArgParser *parser, KshCommandFn root, StrView input)
 {
+    parser->err[0] = '\0';
     parser->lex = (Lexer){ .text = input };
     return root(parser);
 }
@@ -69,7 +70,7 @@ bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
 
     while (lex_next(&parser->lex)) {
         if (!arg_name_from_tok(parser->lex.cur_tok, &arg_name)) {
-            sprintf(parser->err_msg,
+            sprintf(parser->err,
                     "arg name was expected but found `"STRV_FMT"`\n",
                     STRV_ARG(parser->lex.cur_tok));
             return false;
@@ -79,7 +80,7 @@ bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
             for (size_t i = 0; i < arg_name.data.len; i++) {
                 arg_def = get_arg_def(arg_defs, (StrView){ 1, &arg_name.data.items[i] });
                 if (!arg_def || arg_def->kind != KSH_ARG_KIND_OPT) {
-                    sprintf(parser->err_msg,
+                    sprintf(parser->err,
                             "arg `%c` not found\n",
                             arg_name.data.items[i]);
                     return false;
@@ -91,7 +92,7 @@ bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
 
         arg_def = get_arg_def(arg_defs, arg_name.data);
         if (!arg_def) {
-            sprintf(parser->err_msg,
+            sprintf(parser->err,
                     "arg `"STRV_FMT"` not found\n",
                     STRV_ARG(arg_name.data));
             return false;
@@ -99,13 +100,13 @@ bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
 
         if (IS_PARAM(arg_def->kind)) {
             if (!lex_next(&parser->lex)) {
-                sprintf(parser->err_msg,
+                sprintf(parser->err,
                         "arg `"STRV_FMT"` requires value\n",
                         STRV_ARG(arg_name.data));
                 return false;
             }
             if (!parsemap[arg_def->kind](parser->lex.cur_tok, arg_def->data.as_ptr)) {
-                sprintf(parser->err_msg,
+                sprintf(parser->err,
                         "value `"STRV_FMT"` is not valid\n",
                         STRV_ARG(parser->lex.cur_tok));
                 return false;
@@ -118,11 +119,9 @@ bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
                 print_arg_help(arg_defs.items[i]);
                 puts("");
             }
-            parser->err_code = KSH_ERR_EARLY_EXIT;
             return false;
         } else if (arg_def->kind == KSH_ARG_KIND_SUBCMD) {
             arg_def->data.as_fn(parser);
-            parser->err_code = KSH_ERR_EARLY_EXIT;
             return false;
         }
     }

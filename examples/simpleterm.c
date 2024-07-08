@@ -26,8 +26,8 @@ static int root(KshArgParser *parser)
     if (!ksh_parser_parse_args(parser,
         KSH_HELP("a simple terminal"),
         KSH_SUBCMD(print, "displays your amazing messages"),
-    ) && parser->err_code != KSH_ERR_EARLY_EXIT) {
-        printf("error: %s\n", parser->err_msg);
+    ) && parser->err[0]) {
+        printf("error: %s", parser->err);
         return 1;
     }
 

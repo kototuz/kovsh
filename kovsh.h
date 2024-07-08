@@ -52,9 +52,7 @@ typedef struct {
 #define MAX_ERR_MSG 100
 typedef struct {
     Lexer lex;
-    KshErr err_code;
-    char err_msg[MAX_ERR_MSG];
-    int exit_code;
+    char err[MAX_ERR_MSG];
 } KshArgParser;
 
 typedef int (*KshCommandFn)(KshArgParser *parser);
