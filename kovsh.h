@@ -12,16 +12,6 @@
 #define STRV_FMT "%.*s"
 #define STRV_ARG(sv) (int) (sv).len, (sv).items
 
-typedef enum {
-    KSH_ERR_OK = 0,
-    KSH_ERR_COMMAND_NOT_FOUND,
-    KSH_ERR_TOKEN_EXPECTED,
-    KSH_ERR_ARG_NOT_FOUND,
-    KSH_ERR_VALUE_EXPECTED,
-    KSH_ERR_PARSING_FAILED,
-    KSH_ERR_EARLY_EXIT,
-} KshErr;
-
 typedef struct {
     size_t len;
     const char *items;
