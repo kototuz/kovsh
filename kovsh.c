@@ -30,7 +30,7 @@ static bool arg_name_from_tok(Token tok, ArgName *res);
 static bool param_str_cb(StrView *self, KshArgParser *p);
 static bool param_int_cb(int *self, KshArgParser *p);
 static bool flag_cb(bool *self, KshArgParser *p);
-static bool subcmd_cb(KshCommandFn self, KshArgParser *p);
+static bool subcmd_cb(KshSubcmd *self, KshArgParser *p);
 
 
 
@@ -91,7 +91,7 @@ bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
                             arg_name.data.items[i]);
                     return false;
                 }
-                *((bool*)arg_def->data.as_ptr) = true;
+                *((bool*)arg_def->data) = true;
             }
             continue;
         }
@@ -105,11 +105,11 @@ bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
         }
 
         if (arg_def->kind == KSH_ARG_KIND_HELP) {
-            print_help((const char *)arg_def->data.as_ptr, arg_defs);
+            print_help((const char *)arg_def->data, arg_defs);
             return false;
         }
 
-        if (!callbacks[arg_def->kind](arg_def->data.as_ptr, parser))
+        if (!callbacks[arg_def->kind](arg_def->data, parser))
             return false;
     }
 
@@ -281,7 +281,7 @@ static bool flag_cb(bool *self, KshArgParser *p)
     return (*self = true);
 }
 
-static bool subcmd_cb(KshCommandFn self, KshArgParser *p)
+static bool subcmd_cb(KshSubcmd *self, KshArgParser *p)
 {
-    return self(p);
+    return self->fn(p);
 }

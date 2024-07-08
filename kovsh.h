@@ -52,10 +52,7 @@ typedef struct {
     StrView name;
     const char *usage;
     KshArgKind kind;
-    union {
-        void *as_ptr;
-        KshCommandFn as_fn;
-    } data;
+    void *data;
 } KshArgDef;
 
 typedef struct {
@@ -63,16 +60,20 @@ typedef struct {
     size_t count;
 } KshArgDefs;
 
-#define KSH_FLAG(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_FLAG, .data.as_ptr = &(var) }
+typedef struct {
+    KshCommandFn fn;
+} KshSubcmd;
+
+#define KSH_FLAG(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_FLAG, &(var) }
 
 #define KSH_PARAM(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), _Generic((var), \
     int: KSH_ARG_KIND_PARAM_INT,                                                    \
     StrView: KSH_ARG_KIND_PARAM_STR,                                                \
-    default: KSH_ARG_KIND_PARAM_STR), .data.as_ptr = &(var) }                       \
+    default: KSH_ARG_KIND_PARAM_STR), &(var) }                                      \
 
-#define KSH_HELP(help) (KshArgDef){ STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, .data.as_ptr = (help) }
+#define KSH_HELP(help) (KshArgDef){ STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, (help) }
 
-#define KSH_SUBCMD(fn, usage) (KshArgDef){ STRV_LIT(#fn), (usage), KSH_ARG_KIND_SUBCMD, .data.as_fn = (fn) }
+#define KSH_SUBCMD(fn, usage) (KshArgDef){ STRV_LIT(#fn), (usage), KSH_ARG_KIND_SUBCMD, &(KshSubcmd){ (fn) } }
 
 #define ksh_parser_parse_args(par, ...) \
     ksh_parser_parse_args_((par), (KshArgDefs){ (KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef) })
