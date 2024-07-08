@@ -12,6 +12,9 @@
 #define STRV_FMT "%.*s"
 #define STRV_ARG(sv) (int) (sv).len, (sv).items
 
+#define MAX_ERR_MSG 100
+typedef char KshErr[MAX_ERR_MSG];
+
 typedef struct {
     size_t len;
     const char *items;
@@ -39,10 +42,9 @@ typedef struct {
     bool is_peek;
 } Lexer;
 
-#define MAX_ERR_MSG 100
 typedef struct {
     Lexer lex;
-    char err[MAX_ERR_MSG];
+    KshErr err;
 } KshArgParser;
 
 typedef int (*KshCommandFn)(KshArgParser *parser);
