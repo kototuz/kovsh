@@ -10,7 +10,6 @@ static int print(KshArgParser *parser)
     StrView m;
     int n = 1;
     if (!ksh_parser_parse_args(parser,
-        KSH_HELP("displays your amazing messages"),
         KSH_PARAM(m, "message"),
         KSH_PARAM(n, "count")
     )) return 0;
@@ -24,7 +23,6 @@ static int print(KshArgParser *parser)
 static int root(KshArgParser *parser)
 {
     if (!ksh_parser_parse_args(parser,
-        KSH_HELP("a simple terminal"),
         KSH_SUBCMD(print, "displays your amazing messages"),
     ) && parser->err[0]) {
         printf("error: %s", parser->err);

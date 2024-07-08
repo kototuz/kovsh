@@ -27,13 +27,12 @@ StrView strv_new(const char *data, size_t data_len);
 bool    strv_eq(StrView sv1, StrView sv2);
 
 typedef enum {
-    KSH_ARG_KIND_OPT,
     KSH_ARG_KIND_PARAM_STR,
     KSH_ARG_KIND_PARAM_INT,
-    KSH_ARG_KIND_HELP,
-    KSH_ARG_KIND_SUBCMD
+    KSH_ARG_KIND_FLAG,
+    KSH_ARG_KIND_SUBCMD,
+    KSH_ARG_KIND_HELP
 } KshArgKind;
-#define IS_PARAM(kind) (kind > KSH_ARG_KIND_OPT && kind <= KSH_ARG_KIND_PARAM_INT)
 
 typedef struct {
     StrView text;
@@ -64,7 +63,7 @@ typedef struct {
     size_t count;
 } KshArgDefs;
 
-#define KSH_OPT(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_OPT, .data.as_ptr = &(var) }
+#define KSH_FLAG(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_FLAG, .data.as_ptr = &(var) }
 
 #define KSH_PARAM(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), _Generic((var), \
     int: KSH_ARG_KIND_PARAM_INT,                                                    \
