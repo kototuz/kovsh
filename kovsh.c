@@ -27,18 +27,18 @@ static void print_help(const char *descr, KshArgDefs args);
 static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name);
 static bool arg_name_from_tok(Token tok, ArgName *res);
 
-static bool param_str_cb(StrView *self, KshArgParser *p);
-static bool param_int_cb(int *self, KshArgParser *p);
+static bool param_str_cb(KshParam *self, KshArgParser *p);
+static bool param_int_cb(KshParam *self, KshArgParser *p);
 static bool flag_cb(bool *self, KshArgParser *p);
 static bool subcmd_cb(KshSubcmd *self, KshArgParser *p);
 
 
 
 static const Callback callbacks[] = {
-    [KSH_ARG_KIND_PARAM_STR] = (Callback) param_str_cb,
-    [KSH_ARG_KIND_PARAM_INT] = (Callback) param_int_cb,
-    [KSH_ARG_KIND_FLAG]      = (Callback) flag_cb,
-    [KSH_ARG_KIND_SUBCMD]    = (Callback) subcmd_cb
+    [KSH_ARG_KIND_PARAM_STR]     = (Callback) param_str_cb,
+    [KSH_ARG_KIND_PARAM_INT]     = (Callback) param_int_cb,
+    [KSH_ARG_KIND_FLAG]          = (Callback) flag_cb,
+    [KSH_ARG_KIND_SUBCMD]        = (Callback) subcmd_cb
 };
 
 
@@ -238,40 +238,48 @@ static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name)
     return NULL;
 }
 
-static bool param_str_cb(StrView *self, KshArgParser *p)
+static bool param_str_cb(KshParam *self, KshArgParser *p)
 {
-    if (!lex_next(&p->lex)) {
-        sprintf(p->err, "string is required");
-        return false;
-    }
-    StrView in = p->lex.cur_tok;
+    for (size_t i = 0; i < self->count; i++) {
+        if (!lex_next(&p->lex)) {
+            sprintf(p->err, "%zu string/s is required", self->count);
+            return false;
+        }
 
-    if (in.items[0] == '"' || in.items[0] == '\'') {
-        self->items = &in.items[1];
-        self->len = in.len-2;
-    } else *self = in;
+        StrView in = p->lex.cur_tok;
+        ((StrView *)self->data)[i] =
+            in.items[0] == '"' || in.items[0] == '\'' ?
+                (StrView) {
+                    .items = &in.items[1],
+                    .len = in.len-2,
+                }
+            : in;
+    }
 
     return true;
 }
 
-static bool param_int_cb(int *self, KshArgParser *p)
+static bool param_int_cb(KshParam *self, KshArgParser *p)
 {
-    if (!lex_next(&p->lex)) {
-        sprintf(p->err, "int is required");
-        return false;
-    };
-    StrView in = p->lex.cur_tok;
-
-    int result = 0;
-    for (size_t i = 0; i < in.len; i++) {
-        if (!isdigit(in.items[i])) {
-            sprintf(p->err, "`"STRV_FMT"` is not an int", STRV_ARG(in));
+    for (size_t i = 0; i < self->count; i++) {
+        if (!lex_next(&p->lex)) {
+            sprintf(p->err, "%zu int/s is required", self->count);
             return false;
         }
-        result = result*10 + in.items[i]-'0';
+
+        StrView in = p->lex.cur_tok;
+        int result = 0;
+        for (size_t i = 0; i < in.len; i++) {
+            if (!isdigit(in.items[i])) {
+                sprintf(p->err, "`"STRV_FMT"` is not an int", STRV_ARG(in));
+                return false;
+            }
+            result = result*10 + in.items[i]-'0';
+        }
+
+        ((int *)self->data)[i] = result;
     }
 
-    *self = result;
     return true;
 }
 

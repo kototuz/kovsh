@@ -31,7 +31,7 @@ typedef enum {
     KSH_ARG_KIND_PARAM_INT,
     KSH_ARG_KIND_FLAG,
     KSH_ARG_KIND_SUBCMD,
-    KSH_ARG_KIND_HELP
+    KSH_ARG_KIND_HELP,
 } KshArgKind;
 
 typedef struct {
@@ -64,12 +64,16 @@ typedef struct {
     KshCommandFn fn;
 } KshSubcmd;
 
+typedef struct {
+    void *data;
+    size_t count;
+} KshParam;
+
 #define KSH_FLAG(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_FLAG, &(var) }
 
 #define KSH_PARAM(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), _Generic((var), \
-    int: KSH_ARG_KIND_PARAM_INT,                                                    \
-    StrView: KSH_ARG_KIND_PARAM_STR,                                                \
-    default: KSH_ARG_KIND_PARAM_STR), &(var) }                                      \
+    int*: KSH_ARG_KIND_PARAM_INT, \
+    StrView*: KSH_ARG_KIND_PARAM_STR), &(KshParam){ (var), sizeof(var)/sizeof(var[0]) } } \
 
 #define KSH_HELP(help) (KshArgDef){ STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, (help) }
 
