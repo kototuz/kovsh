@@ -9,10 +9,16 @@ static int print(KshArgParser *parser)
 {
     StrView m;
     int n = 1;
+    bool infinitly;
     if (!ksh_parser_parse_args(parser,
         KSH_PARAM(m, "message"),
-        KSH_PARAM(n, "count")
+        KSH_PARAM(n, "count"),
+        KSH_FLAG(infinitly, "prints infinitly?")
     )) return 0;
+
+    if (infinitly)
+        for (;;)
+            printf(STRV_FMT"\n", STRV_ARG(m));
 
     for (int i = 0; i < n; i++)
         printf(STRV_FMT"\n", STRV_ARG(m));
