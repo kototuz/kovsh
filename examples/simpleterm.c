@@ -7,20 +7,22 @@
 
 static int print(KshArgParser *parser)
 {
-    StrView m[1] = {STRV_LIT("хомяк")};
-    int n[1] = {1};
-    bool infinitly = false;
+    StrView m;
+    int n = 1;
+    bool inf;
     if (!ksh_parser_parse_args(parser,
         KSH_HELP("prints your amazing messages to a screen"),
-        KSH_PARAM(m, "message"),
-        KSH_PARAM(n, "count"),
-        KSH_FLAG(infinitly, "prints infinitly?")
+        KSH_STORE(m, "message"),
+        KSH_STORE(n, "count"),
+        KSH_STORE(inf, "infinitly?"),
     )) return 0;
 
-    for (; *n > 0; (*n)--) {
-        printf(STRV_FMT"\n", STRV_ARG(m[0]));
-    }
+    if (inf)
+        for (;;)
+            printf(STRV_FMT"\n", STRV_ARG(m));
 
+    for (; n > 0; n--)
+        printf(STRV_FMT"\n", STRV_ARG(m));
 
     return 0;
 }

@@ -27,9 +27,9 @@ StrView strv_new(const char *data, size_t data_len);
 bool    strv_eq(StrView sv1, StrView sv2);
 
 typedef enum {
-    KSH_ARG_KIND_PARAM_STR,
-    KSH_ARG_KIND_PARAM_INT,
-    KSH_ARG_KIND_FLAG,
+    KSH_ARG_KIND_STORE_STR,
+    KSH_ARG_KIND_STORE_INT,
+    KSH_ARG_KIND_STORE_FLAG,
     KSH_ARG_KIND_SUBCMD,
     KSH_ARG_KIND_HELP,
 } KshArgKind;
@@ -67,13 +67,17 @@ typedef struct {
 typedef struct {
     void *data;
     size_t count;
-} KshParam;
+} KshStore;
 
-#define KSH_FLAG(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), KSH_ARG_KIND_FLAG, &(var) }
-
-#define KSH_PARAM(var, usage) (KshArgDef){ STRV_LIT(#var), (usage), _Generic((var), \
-    int*: KSH_ARG_KIND_PARAM_INT, \
-    StrView*: KSH_ARG_KIND_PARAM_STR), &(KshParam){ (var), sizeof(var)/sizeof(var[0]) } } \
+#define KSH_STORE_SINGLE(var, usage, kind) (KshArgDef){ STRV_LIT(#var), (usage), kind, &(KshStore){ &var, 1 } }
+#define KSH_STORE_ARRAY(T, var, usage, kind) (KshArgDef){ STRV_LIT(#var), (usage), kind, &(KshStore){ &var, sizeof(var)/(sizeof(T)) } }
+#define KSH_STORE(var, usage) _Generic(var,                                 \
+    bool:     KSH_STORE_SINGLE(var, usage, KSH_ARG_KIND_STORE_FLAG),        \
+    int:      KSH_STORE_SINGLE(var, usage, KSH_ARG_KIND_STORE_INT),         \
+    StrView:  KSH_STORE_SINGLE(var, usage, KSH_ARG_KIND_STORE_STR),         \
+    bool*:    KSH_STORE_ARRAY(bool, var, usage, KSH_ARG_KIND_STORE_FLAG),   \
+    int*:     KSH_STORE_ARRAY(int, var, usage, KSH_ARG_KIND_STORE_INT),     \
+    StrView*: KSH_STORE_ARRAY(StrView, var, usage, KSH_ARG_KIND_STORE_STR)) \
 
 #define KSH_HELP(help) (KshArgDef){ STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, (help) }
 

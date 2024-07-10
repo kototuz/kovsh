@@ -27,18 +27,18 @@ static void print_help(const char *descr, KshArgDefs args);
 static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name);
 static bool arg_name_from_tok(Token tok, ArgName *res);
 
-static bool param_str_cb(KshParam *self, KshArgParser *p);
-static bool param_int_cb(KshParam *self, KshArgParser *p);
-static bool flag_cb(bool *self, KshArgParser *p);
+static bool store_str_cb(KshStore *self, KshArgParser *p);
+static bool store_int_cb(KshStore *self, KshArgParser *p);
+static bool store_flag_cb(KshStore *self, KshArgParser *p);
 static bool subcmd_cb(KshSubcmd *self, KshArgParser *p);
 
 
 
 static const Callback callbacks[] = {
-    [KSH_ARG_KIND_PARAM_STR]     = (Callback) param_str_cb,
-    [KSH_ARG_KIND_PARAM_INT]     = (Callback) param_int_cb,
-    [KSH_ARG_KIND_FLAG]          = (Callback) flag_cb,
-    [KSH_ARG_KIND_SUBCMD]        = (Callback) subcmd_cb
+    [KSH_ARG_KIND_STORE_STR]  = (Callback) store_str_cb,
+    [KSH_ARG_KIND_STORE_INT]  = (Callback) store_int_cb,
+    [KSH_ARG_KIND_STORE_FLAG] = (Callback) store_flag_cb,
+    [KSH_ARG_KIND_SUBCMD]     = (Callback) subcmd_cb
 };
 
 
@@ -85,7 +85,7 @@ bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
         if (arg_name.is_multiopt) {
             for (size_t i = 0; i < arg_name.data.len; i++) {
                 arg_def = get_arg_def(arg_defs, (StrView){ 1, &arg_name.data.items[i] });
-                if (!arg_def || arg_def->kind != KSH_ARG_KIND_FLAG) {
+                if (!arg_def || arg_def->kind != KSH_ARG_KIND_STORE_FLAG) {
                     sprintf(parser->err,
                             "arg `%c` not found\n",
                             arg_name.data.items[i]);
@@ -238,7 +238,7 @@ static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name)
     return NULL;
 }
 
-static bool param_str_cb(KshParam *self, KshArgParser *p)
+static bool store_str_cb(KshStore *self, KshArgParser *p)
 {
     for (size_t i = 0; i < self->count; i++) {
         if (!lex_next(&p->lex)) {
@@ -259,7 +259,7 @@ static bool param_str_cb(KshParam *self, KshArgParser *p)
     return true;
 }
 
-static bool param_int_cb(KshParam *self, KshArgParser *p)
+static bool store_int_cb(KshStore *self, KshArgParser *p)
 {
     for (size_t i = 0; i < self->count; i++) {
         if (!lex_next(&p->lex)) {
@@ -283,10 +283,11 @@ static bool param_int_cb(KshParam *self, KshArgParser *p)
     return true;
 }
 
-static bool flag_cb(bool *self, KshArgParser *p)
+static bool store_flag_cb(KshStore *self, KshArgParser *p)
 {
     (void) p;
-    return (*self = true);
+    *(bool*)self->data = true;
+    return true;
 }
 
 static bool subcmd_cb(KshSubcmd *self, KshArgParser *p)
