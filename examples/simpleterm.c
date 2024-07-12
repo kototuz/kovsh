@@ -9,7 +9,7 @@ static int print(KshArgParser *parser)
 {
     StrView m;
     int n = 1;
-    bool inf;
+    bool inf = false;
     if (!ksh_parser_parse_args(parser,
         KSH_HELP("prints your amazing messages to a screen"),
         KSH_STORE(m, "message"),
