@@ -26,14 +26,6 @@ StrView strv_from_str(const char *str);
 StrView strv_new(const char *data, size_t data_len);
 bool    strv_eq(StrView sv1, StrView sv2);
 
-typedef enum {
-    KSH_ARG_KIND_STORE_STR,
-    KSH_ARG_KIND_STORE_INT,
-    KSH_ARG_KIND_STORE_FLAG,
-    KSH_ARG_KIND_SUBCMD,
-    KSH_ARG_KIND_HELP,
-} KshArgKind;
-
 typedef struct {
     StrView text;
     size_t cursor;
@@ -42,57 +34,78 @@ typedef struct {
 } Lexer;
 
 typedef struct {
-    Lexer lex;
-    KshErr err;
-} KshParser;
-
-typedef int (*KshCommandFn)(KshParser *parser);
-
-typedef struct {
     StrView name;
     const char *usage;
-    KshArgKind kind;
-    void *data;
-} KshArgDef;
+} KshArg;
+
+typedef enum {
+    KSH_PARAM_TYPE_STR,
+    KSH_PARAM_TYPE_INT
+} KshParamType;
 
 typedef struct {
-    KshArgDef *items;
+    KshArg base;
+    KshParamType type;
+    size_t max;
+    void *var;
+} KshParam;
+
+typedef struct {
+    KshParam *items;
     size_t count;
-} KshArgDefs;
+} KshParams;
 
 typedef struct {
+    KshArg base;
+    bool *var;
+} KshFlag;
+
+typedef struct {
+    KshFlag *items;
+    size_t count;
+} KshFlags;
+
+struct KshParser;
+typedef int (*KshCommandFn)(struct KshParser *p);
+typedef struct {
+    KshArg base;
     KshCommandFn fn;
 } KshSubcmd;
 
 typedef struct {
-    void *data;
+    KshSubcmd *items;
     size_t count;
-} KshStore;
+} KshSubcmds;
 
-#define KSH_KIND(var) _Generic(var,    \
-    bool:     KSH_ARG_KIND_STORE_FLAG, \
-    bool*:    KSH_ARG_KIND_STORE_FLAG, \
-    int:      KSH_ARG_KIND_STORE_INT,  \
-    int*:     KSH_ARG_KIND_STORE_INT,  \
-    StrView:  KSH_ARG_KIND_STORE_STR,  \
-    StrView*: KSH_ARG_KIND_STORE_STR)  \
+typedef struct KshParser {
+    Lexer lex;
+    KshParams params;
+    KshFlags flags;
+    KshSubcmds subcmds;
+    KshErr err;
+    KshCommandFn root;
+} KshParser;
+
+#define KSH_PARAMS(p, ...) p->params = (KshParams){ (KshParam[]){__VA_ARGS__}, sizeof((KshParam[]){__VA_ARGS__})/sizeof(KshParam) }
+#define KSH_FLAGS(p, ...) p->flags = (KshFlags){ (KshFlag[]){__VA_ARGS__}, sizeof((KshFlag[]){__VA_ARGS__})/sizeof(KshFlag) }
+#define KSH_SUBCMDS(p, ...) p->subcmds = (KshSubcmds){ (KshSubcmd[]){__VA_ARGS__}, sizeof((KshSubcmd[]){__VA_ARGS__})/sizeof(KshSubcmd) }
+
+#define KSH_PARAM(var, usage)  { { STRV_LIT(#var), usage }, KSH_PARAM_TYPE(var), sizeof(var)/(KSH_TYPESIZE(var)), &var }
+#define KSH_FLAG(var, usage)   { { STRV_LIT(#var), usage }, &var }
+#define KSH_SUBCMD(var, usage) { { STRV_LIT(#var), usage }, var }
+
+#define KSH_PARAM_TYPE(var) _Generic(var, \
+    StrView:  KSH_PARAM_TYPE_STR,         \
+    StrView*: KSH_PARAM_TYPE_STR,         \
+    int:      KSH_PARAM_TYPE_INT,         \
+    int*:     KSH_PARAM_TYPE_INT)         \
 
 #define KSH_TYPESIZE(var) _Generic(var, \
-    bool*: sizeof(bool),                \
     int*: sizeof(int),                  \
     StrView*: sizeof(StrView),          \
     default: sizeof(var))               \
 
-#define KSH_STORE(var, usage) { STRV_LIT(#var), usage, KSH_KIND(var), &(KshStore){ &var, sizeof(var)/(KSH_TYPESIZE(var)) } }
-
-#define KSH_HELP(help) { STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, (help) }
-
-#define KSH_SUBCMD(fn, usage) { STRV_LIT(#fn), (usage), KSH_ARG_KIND_SUBCMD, &(KshSubcmd){ (fn) } }
-
-#define ksh_parser_parse_args(par, ...) \
-    ksh_parser_parse_args_((par), (KshArgDefs){ (KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef) })
-
-bool ksh_parser_parse_args_(KshParser *parser, KshArgDefs arg_defs);
-int  ksh_parser_parse_cmd(KshParser *parser, KshCommandFn root, StrView input);
+bool ksh_parse(KshParser *p);
+bool ksh_parse_cmd(KshParser *p, StrView cmd);
 
 #endif

@@ -2,15 +2,21 @@
 
 #include <string.h>
 #include <ctype.h>
+#include <stdint.h>
 
-typedef bool (*ParseFn)(StrView in, void *res);
-
-typedef bool (*Callback)(void *self, KshParser *parser);
+typedef enum {
+    KSH_ARG_KIND_FLAG,
+    KSH_ARG_KIND_PARAM,
+    KSH_ARG_KIND_SUBCMD
+} KshArgKind;
 
 typedef struct {
-    StrView data;
-    bool is_multiopt;
-} ArgName;
+    uint8_t *items;
+    size_t count;
+} Bytes;
+
+typedef bool (*ParamParser)(Token t, void *res, size_t idx);
+typedef bool (*Handler)(void *self, KshParser *p);
 
 
 
@@ -19,26 +25,43 @@ static bool lex_next(Lexer *l);
 static bool lex_next_if(Lexer *l, Token expected);
 static bool lex_next_if_pred(Lexer *l, bool (*predicate)(Token));
 
+static bool is_multiopt(StrView sv);
+
 static bool isstr(int s);
 static bool isend(int s);
 static bool isbound(int s);
 
-static void print_help(const char *descr, KshArgDefs args);
-static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name);
-static bool arg_name_from_tok(Token tok, ArgName *res);
+static KshArg *find_arg(Bytes bts, size_t itsize, StrView name);
 
-static bool store_str_cb(KshStore *self, KshParser *p);
-static bool store_int_cb(KshStore *self, KshParser *p);
-static bool store_flag_cb(KshStore *self, KshParser *p);
-static bool subcmd_cb(KshSubcmd *self, KshParser *p);
+static bool param_handler(KshParam *self, KshParser *p);
+static bool flag_handler(KshFlag *self, KshParser *p);
+static bool subcmd_handler(KshSubcmd *self, KshParser *p);
+
+static bool str_parser(Token t, StrView *re, size_t idx);
+static bool int_parser(Token t, int *res, size_t idx);
 
 
 
-static const Callback callbacks[] = {
-    [KSH_ARG_KIND_STORE_STR]  = (Callback) store_str_cb,
-    [KSH_ARG_KIND_STORE_INT]  = (Callback) store_int_cb,
-    [KSH_ARG_KIND_STORE_FLAG] = (Callback) store_flag_cb,
-    [KSH_ARG_KIND_SUBCMD]     = (Callback) subcmd_cb
+static const char *param_type_str[] = {
+    [KSH_PARAM_TYPE_STR] = "str",
+    [KSH_PARAM_TYPE_INT] = "int"
+};
+
+static const ParamParser parsers[] = {
+    [KSH_PARAM_TYPE_STR] = (ParamParser) str_parser,
+    [KSH_PARAM_TYPE_INT] = (ParamParser) int_parser,
+};
+
+static const Handler handlers[] = {
+    [KSH_ARG_KIND_PARAM]  = (Handler) param_handler,
+    [KSH_ARG_KIND_FLAG]   = (Handler) flag_handler,
+    [KSH_ARG_KIND_SUBCMD] = (Handler) subcmd_handler,
+};
+
+static const char *arg_kind_str[] = {
+    [KSH_ARG_KIND_PARAM]  = "parameter",
+    [KSH_ARG_KIND_FLAG]   = "flag",
+    [KSH_ARG_KIND_SUBCMD] = "subcommand"
 };
 
 
@@ -69,48 +92,61 @@ int ksh_parser_parse_cmd(KshParser *parser, KshCommandFn root, StrView input)
     return root(parser);
 }
 
-bool ksh_parser_parse_args_(KshParser *parser, KshArgDefs arg_defs)
+bool ksh_parse_cmd(KshParser *p, StrView cmd)
 {
-    KshArgDef *arg_def;
-    ArgName arg_name;
+    p->err[0] = '\0';
+    p->lex = (Lexer){ .text = cmd };
+    p->root(p);
+    return true;
+}
 
-    while (lex_next(&parser->lex)) {
-        if (!arg_name_from_tok(parser->lex.cur_tok, &arg_name)) {
-            sprintf(parser->err,
-                    "arg name was expected but found `"STRV_FMT"`\n",
-                    STRV_ARG(parser->lex.cur_tok));
-            return false;
-        }
+bool ksh_parse(KshParser *p)
+{
+    StrView arg_name;
+    KshArgKind arg_kind;
+    size_t item_size;
+    union {
+        KshParams as_params;
+        KshFlags as_flags;
+        KshSubcmds as_subcmds;
+        Bytes as_bytes;
+    } source;
 
-        if (arg_name.is_multiopt) {
-            for (size_t i = 0; i < arg_name.data.len; i++) {
-                arg_def = get_arg_def(arg_defs, (StrView){ 1, &arg_name.data.items[i] });
-                if (!arg_def || arg_def->kind != KSH_ARG_KIND_STORE_FLAG) {
-                    sprintf(parser->err,
-                            "arg `%c` not found\n",
-                            arg_name.data.items[i]);
-                    return false;
-                }
-                *((bool*)arg_def->data) = true;
+    while (lex_next(&p->lex)) {
+        arg_name = p->lex.cur_tok;
+        if (arg_name.items[0] == '-') {
+            if (lex_peek(&p->lex) && p->lex.cur_tok.items[0] != '-') {
+                item_size = sizeof(KshParam);
+                source.as_params = p->params;
+                arg_kind = KSH_ARG_KIND_PARAM;
+            } else {
+                item_size = sizeof(KshFlag);
+                source.as_flags = p->flags;
+                arg_kind = KSH_ARG_KIND_FLAG;
             }
-            continue;
+            if (arg_name.items[1] == '-' && arg_name.len > 3) {
+                arg_name.items += 2;
+                arg_name.len -= 2;
+            } else if (arg_name.len == 2) {
+                arg_name.items += 1;
+                arg_name.len = 1;
+            }
+        } else {
+            source.as_subcmds = p->subcmds;
+            arg_kind = KSH_ARG_KIND_SUBCMD;
+            item_size = sizeof(KshSubcmd);
         }
 
-        arg_def = get_arg_def(arg_defs, arg_name.data);
-        if (!arg_def) {
-            sprintf(parser->err,
-                    "arg `"STRV_FMT"` not found\n",
-                    STRV_ARG(arg_name.data));
+        KshArg *arg = find_arg(source.as_bytes, item_size, arg_name);
+        if (!arg) {
+            sprintf(p->err,
+                    "%s `"STRV_FMT"` is not found",
+                    arg_kind_str[arg_kind],
+                    STRV_ARG(arg_name));
             return false;
         }
 
-        if (arg_def->kind == KSH_ARG_KIND_HELP) {
-            print_help((const char *)arg_def->data, arg_defs);
-            return false;
-        }
-
-        if (!callbacks[arg_def->kind](arg_def->data, parser))
-            return false;
+        handlers[arg_kind](arg, p);
     }
 
     return true;
@@ -178,6 +214,13 @@ static bool lex_next_if_pred(Lexer *l, bool (*predicate)(Token))
            lex_next(l);
 }
 
+static bool is_multiopt(StrView sv)
+{
+    return sv.len > 2         &&
+           sv.items[0] == '-' &&
+           sv.items[1] != '-';
+}
+
 static bool isstr(int s)
 {
     return s == '"' || s == '\'';
@@ -195,102 +238,76 @@ static bool isbound(int s)
            isend(s);
 }
 
-static void print_help(const char *descr, KshArgDefs args)
+static KshArg *find_arg(Bytes bts, size_t itsize, StrView name)
 {
-    (void) args;
-    printf("[description]: %s\n", descr);
-}
-
-static bool arg_name_from_tok(Token tok, ArgName *res)
-{
-    if (tok.items[0] != '-') {
-        *res = (ArgName){ .data = tok };
-    } else if (tok.items[1] == '-') {
-        if (tok.len <= 3) return false;
-        *res = (ArgName){
-            .data.items = &tok.items[2],
-            .data.len = tok.len-2
-        };
-    } else if (tok.len > 2) {
-        *res = (ArgName){
-            .data.items = &tok.items[1],
-            .data.len = tok.len-1,
-            .is_multiopt = true
-        };
-    } else if (tok.len == 2) {
-        *res = (ArgName){
-            .data.items = &tok.items[1],
-            .data.len = 1,
-        };
-    } else return false;
-
-    return true;
-}
-
-static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name)
-{
-    for (size_t i = 0; i < arg_defs.count; i++) {
-        if (strv_eq(name, arg_defs.items[i].name)) {
-            return &arg_defs.items[i];
-        }
+    for (size_t i = 0; i < bts.count; i++) {
+        bts.items += i*itsize;
+        if (strv_eq(name, ((KshArg*)bts.items)->name))
+            return (KshArg*)bts.items;
     }
 
     return NULL;
 }
 
-static bool store_str_cb(KshStore *self, KshParser *p)
+
+
+static bool param_handler(KshParam *self, KshParser *p)
 {
-    for (size_t i = 0; i < self->count; i++) {
-        if (!lex_next(&p->lex)) {
-            sprintf(p->err, "%zu string/s is required", self->count);
+    if (!lex_next(&p->lex)) {
+        sprintf(p->err, "at least 1 param is required");
+        return false;
+    }
+
+    size_t count = self->max-1;
+    ParamParser pp = parsers[self->type];
+    do {
+        if (!pp(p->lex.cur_tok, self->var, count)) {
+            sprintf(p->err,
+                    "`"STRV_FMT"` is not a %s",
+                    STRV_ARG(p->lex.cur_tok),
+                    param_type_str[self->type]);
             return false;
         }
-
-        StrView in = p->lex.cur_tok;
-        ((StrView *)self->data)[i] =
-            in.items[0] == '"' || in.items[0] == '\'' ?
-                (StrView) {
-                    .items = &in.items[1],
-                    .len = in.len-2,
-                }
-            : in;
-    }
+    } while (
+        count-- != 0                   &&
+        lex_next(&p->lex)              &&
+        p->lex.cur_tok.items[0] != '-' 
+    );
 
     return true;
 }
 
-static bool store_int_cb(KshStore *self, KshParser *p)
-{
-    for (size_t i = 0; i < self->count; i++) {
-        if (!lex_next(&p->lex)) {
-            sprintf(p->err, "%zu int/s is required", self->count);
-            return false;
-        }
-
-        StrView in = p->lex.cur_tok;
-        int result = 0;
-        for (size_t i = 0; i < in.len; i++) {
-            if (!isdigit(in.items[i])) {
-                sprintf(p->err, "`"STRV_FMT"` is not an int", STRV_ARG(in));
-                return false;
-            }
-            result = result*10 + in.items[i]-'0';
-        }
-
-        ((int *)self->data)[i] = result;
-    }
-
-    return true;
-}
-
-static bool store_flag_cb(KshStore *self, KshParser *p)
+static bool flag_handler(KshFlag *self, KshParser *p)
 {
     (void) p;
-    *(bool*)self->data = true;
+    return (*self->var = true);
+}
+
+static bool subcmd_handler(KshSubcmd *self, KshParser *p)
+{
+    self->fn(p);
     return true;
 }
 
-static bool subcmd_cb(KshSubcmd *self, KshParser *p)
+static bool str_parser(Token t, StrView *res, size_t idx)
 {
-    return self->fn(p);
+    res[idx] = t;
+    if (isstr(t.items[0])) {
+        res[idx].items += 1;
+        res[idx].len -= 2;
+    }
+
+    return true;
+}
+
+static bool int_parser(Token t, int *res, size_t idx)
+{
+    int num = 0;
+    for (size_t i = 0; i < t.len; i++) {
+        if (!isdigit(t.items[i])) return false;
+        num = num*10 + t.items[i]-'0';
+    }
+
+    res[idx] = num;
+    return true;
 }
