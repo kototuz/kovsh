@@ -5,7 +5,7 @@
 
 typedef bool (*ParseFn)(StrView in, void *res);
 
-typedef bool (*Callback)(void *self, KshArgParser *parser);
+typedef bool (*Callback)(void *self, KshParser *parser);
 
 typedef struct {
     StrView data;
@@ -27,10 +27,10 @@ static void print_help(const char *descr, KshArgDefs args);
 static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name);
 static bool arg_name_from_tok(Token tok, ArgName *res);
 
-static bool store_str_cb(KshStore *self, KshArgParser *p);
-static bool store_int_cb(KshStore *self, KshArgParser *p);
-static bool store_flag_cb(KshStore *self, KshArgParser *p);
-static bool subcmd_cb(KshSubcmd *self, KshArgParser *p);
+static bool store_str_cb(KshStore *self, KshParser *p);
+static bool store_int_cb(KshStore *self, KshParser *p);
+static bool store_flag_cb(KshStore *self, KshParser *p);
+static bool subcmd_cb(KshSubcmd *self, KshParser *p);
 
 
 
@@ -62,14 +62,14 @@ bool strv_eq(StrView sv1, StrView sv2)
 
 
 
-int ksh_parser_parse_cmd(KshArgParser *parser, KshCommandFn root, StrView input)
+int ksh_parser_parse_cmd(KshParser *parser, KshCommandFn root, StrView input)
 {
     parser->err[0] = '\0';
     parser->lex = (Lexer){ .text = input };
     return root(parser);
 }
 
-bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs)
+bool ksh_parser_parse_args_(KshParser *parser, KshArgDefs arg_defs)
 {
     KshArgDef *arg_def;
     ArgName arg_name;
@@ -238,7 +238,7 @@ static KshArgDef *get_arg_def(KshArgDefs arg_defs, StrView name)
     return NULL;
 }
 
-static bool store_str_cb(KshStore *self, KshArgParser *p)
+static bool store_str_cb(KshStore *self, KshParser *p)
 {
     for (size_t i = 0; i < self->count; i++) {
         if (!lex_next(&p->lex)) {
@@ -259,7 +259,7 @@ static bool store_str_cb(KshStore *self, KshArgParser *p)
     return true;
 }
 
-static bool store_int_cb(KshStore *self, KshArgParser *p)
+static bool store_int_cb(KshStore *self, KshParser *p)
 {
     for (size_t i = 0; i < self->count; i++) {
         if (!lex_next(&p->lex)) {
@@ -283,14 +283,14 @@ static bool store_int_cb(KshStore *self, KshArgParser *p)
     return true;
 }
 
-static bool store_flag_cb(KshStore *self, KshArgParser *p)
+static bool store_flag_cb(KshStore *self, KshParser *p)
 {
     (void) p;
     *(bool*)self->data = true;
     return true;
 }
 
-static bool subcmd_cb(KshSubcmd *self, KshArgParser *p)
+static bool subcmd_cb(KshSubcmd *self, KshParser *p)
 {
     return self->fn(p);
 }

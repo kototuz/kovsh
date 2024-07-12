@@ -44,9 +44,9 @@ typedef struct {
 typedef struct {
     Lexer lex;
     KshErr err;
-} KshArgParser;
+} KshParser;
 
-typedef int (*KshCommandFn)(KshArgParser *parser);
+typedef int (*KshCommandFn)(KshParser *parser);
 
 typedef struct {
     StrView name;
@@ -92,7 +92,7 @@ typedef struct {
 #define ksh_parser_parse_args(par, ...) \
     ksh_parser_parse_args_((par), (KshArgDefs){ (KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef) })
 
-bool ksh_parser_parse_args_(KshArgParser *parser, KshArgDefs arg_defs);
-int  ksh_parser_parse_cmd(KshArgParser *parser, KshCommandFn root, StrView input);
+bool ksh_parser_parse_args_(KshParser *parser, KshArgDefs arg_defs);
+int  ksh_parser_parse_cmd(KshParser *parser, KshCommandFn root, StrView input);
 
 #endif

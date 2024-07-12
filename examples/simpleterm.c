@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-static int print(KshArgParser *parser)
+static int print(KshParser *parser)
 {
     StrView m;
     int n = 1;
@@ -29,7 +29,7 @@ static int print(KshArgParser *parser)
     return 0;
 }
 
-static int root(KshArgParser *parser)
+static int root(KshParser *parser)
 {
     if (!ksh_parser_parse_args(parser,
         KSH_SUBCMD(print, "displays your amazing messages"),
@@ -44,7 +44,7 @@ static int root(KshArgParser *parser)
 int main()
 {
     char buf[100];
-    KshArgParser parser = {0};
+    KshParser parser = {0};
 
     printf(">>> ");
     while (fgets(buf, sizeof(buf), stdin)) {
