@@ -69,19 +69,25 @@ typedef struct {
     size_t count;
 } KshStore;
 
-#define KSH_STORE_SINGLE(var, usage, kind) (KshArgDef){ STRV_LIT(#var), (usage), kind, &(KshStore){ &var, 1 } }
-#define KSH_STORE_ARRAY(T, var, usage, kind) (KshArgDef){ STRV_LIT(#var), (usage), kind, &(KshStore){ &var, sizeof(var)/(sizeof(T)) } }
-#define KSH_STORE(var, usage) _Generic(var,                                 \
-    bool:     KSH_STORE_SINGLE(var, usage, KSH_ARG_KIND_STORE_FLAG),        \
-    int:      KSH_STORE_SINGLE(var, usage, KSH_ARG_KIND_STORE_INT),         \
-    StrView:  KSH_STORE_SINGLE(var, usage, KSH_ARG_KIND_STORE_STR),         \
-    bool*:    KSH_STORE_ARRAY(bool, var, usage, KSH_ARG_KIND_STORE_FLAG),   \
-    int*:     KSH_STORE_ARRAY(int, var, usage, KSH_ARG_KIND_STORE_INT),     \
-    StrView*: KSH_STORE_ARRAY(StrView, var, usage, KSH_ARG_KIND_STORE_STR)) \
+#define KSH_KIND(var) _Generic(var,    \
+    bool:     KSH_ARG_KIND_STORE_FLAG, \
+    bool*:    KSH_ARG_KIND_STORE_FLAG, \
+    int:      KSH_ARG_KIND_STORE_INT,  \
+    int*:     KSH_ARG_KIND_STORE_INT,  \
+    StrView:  KSH_ARG_KIND_STORE_STR,  \
+    StrView*: KSH_ARG_KIND_STORE_STR)  \
 
-#define KSH_HELP(help) (KshArgDef){ STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, (help) }
+#define KSH_TYPESIZE(var) _Generic(var, \
+    bool*: sizeof(bool),                \
+    int*: sizeof(int),                  \
+    StrView*: sizeof(StrView),          \
+    default: sizeof(var))               \
 
-#define KSH_SUBCMD(fn, usage) (KshArgDef){ STRV_LIT(#fn), (usage), KSH_ARG_KIND_SUBCMD, &(KshSubcmd){ (fn) } }
+#define KSH_STORE(var, usage) { STRV_LIT(#var), usage, KSH_KIND(var), &(KshStore){ &var, sizeof(var)/(KSH_TYPESIZE(var)) } }
+
+#define KSH_HELP(help) { STRV_LIT("help"), "prints this help", KSH_ARG_KIND_HELP, (help) }
+
+#define KSH_SUBCMD(fn, usage) { STRV_LIT(#fn), (usage), KSH_ARG_KIND_SUBCMD, &(KshSubcmd){ (fn) } }
 
 #define ksh_parser_parse_args(par, ...) \
     ksh_parser_parse_args_((par), (KshArgDefs){ (KshArgDef[]){__VA_ARGS__}, sizeof((KshArgDef[]){__VA_ARGS__})/sizeof(KshArgDef) })

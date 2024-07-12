@@ -9,17 +9,19 @@ static int print(KshArgParser *parser)
 {
     StrView m;
     int n = 1;
-    bool inf = false;
+    bool dec[1] = {false};
     if (!ksh_parser_parse_args(parser,
         KSH_HELP("prints your amazing messages to a screen"),
         KSH_STORE(m, "message"),
         KSH_STORE(n, "count"),
-        KSH_STORE(inf, "infinitly?"),
+        KSH_STORE(dec, "decorativly?"),
     )) return 0;
 
-    if (inf)
-        for (;;)
-            printf(STRV_FMT"\n", STRV_ARG(m));
+    if (dec[0]) {
+        for (; n > 0; n--)
+            printf("<<"STRV_FMT">>\n", STRV_ARG(m));
+        return 0;
+    }
 
     for (; n > 0; n--)
         printf(STRV_FMT"\n", STRV_ARG(m));
