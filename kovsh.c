@@ -50,6 +50,7 @@ static bool subcmd_handler(KshSubcmd *self, KshParser *p);
 
 static bool str_parser(Token t, StrView *re, size_t idx);
 static bool int_parser(Token t, int *res, size_t idx);
+static bool float_parser(Token t, float *res, size_t idx);
 
 static bool store_bool_fh(bool *self, KshParser *p);
 static bool help_fh(const char *self, KshParser *p);
@@ -66,8 +67,9 @@ static const Handler flag_handlers[] = {
 };
 
 static const KshParamTypeInfo param_types[] = {
-    [KSH_PARAM_TYPE_STR] = { "<str>", (ParamParser) str_parser },
-    [KSH_PARAM_TYPE_INT] = { "<int>", (ParamParser) int_parser }
+    [KSH_PARAM_TYPE_STR]   = { "<str>", (ParamParser) str_parser },
+    [KSH_PARAM_TYPE_INT]   = { "<int>", (ParamParser) int_parser },
+    [KSH_PARAM_TYPE_FLOAT] = { "<float>", (ParamParser) float_parser }
 };
 
 static const KshArgKindInfo arg_kinds[] = {
@@ -323,6 +325,31 @@ static bool int_parser(Token t, int *res, size_t idx)
     for (size_t i = 0; i < t.len; i++) {
         if (!isdigit(t.items[i])) return false;
         num = num*10 + t.items[i]-'0';
+    }
+
+    res[idx] = num;
+    return true;
+}
+
+static bool float_parser(Token t, float *res, size_t idx)
+{
+    float num = 0.0;
+    bool int_part = true;
+    float scale = 1;
+
+    for (size_t i = 0; i < t.len; i++) {
+        if (t.items[i] == '.') {
+            int_part = false;
+            continue;
+        }
+
+        if (!isdigit(t.items[i])) return false;
+        if (int_part) {
+            num = num*10 + t.items[i]-'0';
+        } else {
+            scale = scale/10;
+            num = num + (t.items[i]-'0')*scale;
+        }
     }
 
     res[idx] = num;

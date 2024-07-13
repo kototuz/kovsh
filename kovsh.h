@@ -40,7 +40,8 @@ typedef struct {
 
 typedef enum {
     KSH_PARAM_TYPE_STR,
-    KSH_PARAM_TYPE_INT
+    KSH_PARAM_TYPE_INT,
+    KSH_PARAM_TYPE_FLOAT,
 } KshParamType;
 
 typedef struct {
@@ -107,7 +108,9 @@ typedef struct KshParser {
     StrView*: KSH_PARAM(KSH_PARAM_TYPE_STR, var, usage),                                     \
     int:      KSH_PARAM(KSH_PARAM_TYPE_INT, var, usage),                                     \
     int*:     KSH_PARAM(KSH_PARAM_TYPE_INT, var, usage),                                     \
-    bool:     (KshFlag){ { STRV_LIT(#var), usage }, KSH_FLAG_TYPE_STORE_BOOL, &var }) \
+    float:    KSH_PARAM(KSH_PARAM_TYPE_FLOAT, var, usage),                                   \
+    float*:   KSH_PARAM(KSH_PARAM_TYPE_FLOAT, var, usage),                                   \
+    bool:     (KshFlag){ { STRV_LIT(#var), usage }, KSH_FLAG_TYPE_STORE_BOOL, &var })        \
 
 #define KSH_PARAM_TYPE(var) _Generic(var, \
     StrView:  KSH_PARAM_TYPE_STR,         \

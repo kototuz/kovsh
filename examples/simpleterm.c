@@ -5,38 +5,43 @@
 #include <string.h>
 #include <stdlib.h>
 
-static int print(KshParser *parser)
+static int flot(KshParser *p)
 {
-    bool dec = false;
+    float v;
+    KSH_PARAMS(p, KSH_STORE(v, "float"));
+    if (!ksh_parse(p)) return 0;
 
-    StrView m;
-    int n = 1;
-    KSH_PARAMS(parser,
-        KSH_STORE(m, "message"),
-        KSH_STORE(n, "count")
-    );
-    KSH_FLAGS(parser,
-        KSH_HELP("prints amazing messages"),
-        KSH_STORE(dec, "decorativly?"),
-    );
-    if (!ksh_parse(parser)) return 0;
-
-    if (dec) {
-        for (; n > 0; n--) 
-            printf("<<"STRV_FMT">>\n", STRV_ARG(m));
-        return 0;
-    }
-
-    for (; n > 0; n--) 
-        printf(STRV_FMT"\n", STRV_ARG(m));
+    printf("%f\n", v);
 
     return 0;
+}
+
+static int str(KshParser *p)
+{
+    StrView v;
+    KSH_PARAMS(p, KSH_STORE(v, "str"));
+    if (!ksh_parse(p)) return 0;
+
+    printf(STRV_FMT"\n", STRV_ARG(v));
+
+    return 0;
+}
+
+static int print(KshParser *parser)
+{
+    KSH_FLAGS(parser, KSH_HELP("printer powered by KOVSH"));
+    KSH_SUBCMDS(parser,
+        KSH_SUBCMD(flot, "print float"),
+        KSH_SUBCMD(str, "print str")
+    );
+
+    return ksh_parse(parser);
 }
 
 static int root(KshParser *parser)
 {
     KSH_SUBCMDS(parser,
-        KSH_SUBCMD(print, "prints messages")
+        KSH_SUBCMD(print, "prints messages"),
     );
     KSH_FLAGS(parser,
         KSH_HELP("a simple terminal powered by KOVSH")
