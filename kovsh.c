@@ -41,6 +41,7 @@ static bool isstr(int s);
 static bool isend(int s);
 static bool isbound(int s);
 
+static void parser_reset_args(KshParser *self);
 static KshArg *find_arg(Bytes bts, size_t itsize, StrView name);
 
 static bool param_handler(KshParam *self, KshParser *p);
@@ -107,9 +108,7 @@ bool ksh_parse_cmd(KshParser *p, StrView cmd)
 {
     p->err[0] = '\0';
     p->lex = (Lexer){ .text = cmd };
-    p->params = (KshParams){0};
-    p->flags = (KshFlags){0};
-    p->subcmds = (KshSubcmds){0};
+    parser_reset_args(p);
     p->root(p);
     return true;
 }
@@ -159,6 +158,7 @@ bool ksh_parse(KshParser *p)
         if (!arg_kind_info.handler(arg, p)) return false;
     }
 
+    parser_reset_args(p);
     return true;
 }
 
@@ -248,6 +248,13 @@ static bool isbound(int s)
            isend(s);
 }
 
+static void parser_reset_args(KshParser *self)
+{
+    self->params = (KshParams){0};
+    self->flags = (KshFlags){0};
+    self->subcmds = (KshSubcmds){0};
+}
+
 static KshArg *find_arg(Bytes bts, size_t itsize, StrView name)
 {
     for (size_t i = 0; i < bts.count; i++) {
@@ -294,6 +301,7 @@ static bool flag_handler(KshFlag *self, KshParser *p)
 
 static bool subcmd_handler(KshSubcmd *self, KshParser *p)
 {
+    parser_reset_args(p);
     self->fn(p);
     return false;
 }

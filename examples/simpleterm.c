@@ -38,6 +38,9 @@ static int root(KshParser *parser)
     KSH_SUBCMDS(parser,
         KSH_SUBCMD(print, "prints messages")
     );
+    KSH_FLAGS(parser,
+        KSH_HELP("a simple terminal powered by KOVSH")
+    );
 
     if (!ksh_parse(parser)) {
         if (parser->err[0]) {
