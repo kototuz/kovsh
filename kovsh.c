@@ -125,6 +125,8 @@ bool ksh_parse(KshParser *p)
     while (lex_next(&p->lex)) {
         arg_name = p->lex.cur_tok;
         if (arg_name.items[0] == '-') {
+            arg_name.items += 1;
+            arg_name.len -= 1;
             if (lex_peek(&p->lex) && p->lex.cur_tok.items[0] != '-') {
                 item_size = sizeof(KshParam);
                 source.as_params = p->params;
@@ -133,13 +135,6 @@ bool ksh_parse(KshParser *p)
                 item_size = sizeof(KshFlag);
                 source.as_flags = p->flags;
                 arg_kind = KSH_ARG_KIND_FLAG;
-            }
-            if (arg_name.items[1] == '-' && arg_name.len > 3) {
-                arg_name.items += 2;
-                arg_name.len -= 2;
-            } else if (arg_name.len == 2) {
-                arg_name.items += 1;
-                arg_name.len = 1;
             }
         } else {
             source.as_subcmds = p->subcmds;
