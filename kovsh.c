@@ -18,6 +18,16 @@ typedef struct {
 typedef bool (*ParamParser)(Token t, void *res, size_t idx);
 typedef bool (*Handler)(void *self, KshParser *p);
 
+typedef struct {
+    const char *tostr;
+    Handler handler;
+} KshArgKindInfo;
+
+typedef struct {
+    const char *tostr;
+    ParamParser parser;
+} KshParamTypeInfo;
+
 
 
 static bool lex_peek(Lexer *l);
@@ -44,31 +54,21 @@ static bool store_bool_fh(bool *self, KshParser *p);
 static bool help_fh(const char *self, KshParser *p);
 
 
-static const char *param_type_str[] = {
-    [KSH_PARAM_TYPE_STR] = "str",
-    [KSH_PARAM_TYPE_INT] = "int"
-};
 
 static const Handler flag_handlers[] = {
     [KSH_FLAG_TYPE_STORE_BOOL] = (Handler) store_bool_fh,
     [KSH_FLAG_TYPE_HELP]       = (Handler) help_fh
 };
 
-static const ParamParser parsers[] = {
-    [KSH_PARAM_TYPE_STR] = (ParamParser) str_parser,
-    [KSH_PARAM_TYPE_INT] = (ParamParser) int_parser,
+static const KshParamTypeInfo param_types[] = {
+    [KSH_PARAM_TYPE_STR] = { "str", (ParamParser) str_parser },
+    [KSH_PARAM_TYPE_INT] = { "int", (ParamParser) int_parser }
 };
 
-static const Handler handlers[] = {
-    [KSH_ARG_KIND_PARAM]  = (Handler) param_handler,
-    [KSH_ARG_KIND_FLAG]   = (Handler) flag_handler,
-    [KSH_ARG_KIND_SUBCMD] = (Handler) subcmd_handler,
-};
-
-static const char *arg_kind_str[] = {
-    [KSH_ARG_KIND_PARAM]  = "parameter",
-    [KSH_ARG_KIND_FLAG]   = "flag",
-    [KSH_ARG_KIND_SUBCMD] = "subcommand"
+static const KshArgKindInfo arg_kinds[] = {
+    [KSH_ARG_KIND_PARAM]  = { "parameter", (Handler) param_handler },
+    [KSH_ARG_KIND_FLAG]   = { "flag", (Handler) flag_handler },
+    [KSH_ARG_KIND_SUBCMD] = { "subcommand", (Handler) subcmd_handler }
 };
 
 
@@ -144,16 +144,17 @@ bool ksh_parse(KshParser *p)
             item_size = sizeof(KshSubcmd);
         }
 
+        const KshArgKindInfo arg_kind_info = arg_kinds[arg_kind];
         KshArg *arg = find_arg(source.as_bytes, item_size, arg_name);
         if (!arg) {
             sprintf(p->err,
                     "%s `"STRV_FMT"` not found",
-                    arg_kind_str[arg_kind],
+                    arg_kind_info.tostr,
                     STRV_ARG(arg_name));
             return false;
         }
 
-        if (!handlers[arg_kind](arg, p)) return false;
+        if (!arg_kind_info.handler(arg, p)) return false;
     }
 
     return true;
@@ -265,14 +266,14 @@ static bool param_handler(KshParam *self, KshParser *p)
         return false;
     }
 
+    KshParamTypeInfo pt_info = param_types[self->type];
     size_t count = self->max-1;
-    ParamParser pp = parsers[self->type];
     do {
-        if (!pp(p->lex.cur_tok, self->var, count)) {
+        if (!pt_info.parser(p->lex.cur_tok, self->var, count)) {
             sprintf(p->err,
                     "`"STRV_FMT"` is not a %s",
                     STRV_ARG(p->lex.cur_tok),
-                    param_type_str[self->type]);
+                    pt_info.tostr);
             return false;
         }
     } while (
