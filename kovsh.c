@@ -140,13 +140,13 @@ bool ksh_parse(KshParser *p)
         KshArg *arg = find_arg(source.as_bytes, item_size, arg_name);
         if (!arg) {
             sprintf(p->err,
-                    "%s `"STRV_FMT"` is not found",
+                    "%s `"STRV_FMT"` not found",
                     arg_kind_str[arg_kind],
                     STRV_ARG(arg_name));
             return false;
         }
 
-        handlers[arg_kind](arg, p);
+        if (!handlers[arg_kind](arg, p)) return false;
     }
 
     return true;
@@ -286,7 +286,7 @@ static bool flag_handler(KshFlag *self, KshParser *p)
 static bool subcmd_handler(KshSubcmd *self, KshParser *p)
 {
     self->fn(p);
-    return true;
+    return !p->err[0];
 }
 
 static bool str_parser(Token t, StrView *res, size_t idx)

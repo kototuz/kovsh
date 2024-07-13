@@ -38,7 +38,7 @@ static int root(KshParser *parser)
         KSH_SUBCMD(print, "prints messages")
     );
 
-    if (!ksh_parse(parser) && !parser->err[0]) {
+    if (!ksh_parse(parser) && parser->err[0]) {
         fprintf(stderr, "error: %s\n", parser->err);
         return 1;
     }
