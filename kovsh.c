@@ -53,6 +53,10 @@ static bool int_parser(Token t, int *res, size_t idx);
 static bool store_bool_fh(bool *self, KshParser *p);
 static bool help_fh(const char *self, KshParser *p);
 
+static void print_param_usage(KshParam p);
+static void print_flag_usage(KshFlag f);
+static void print_subcmd_usage(KshSubcmd s);
+
 
 
 static const Handler flag_handlers[] = {
@@ -61,8 +65,8 @@ static const Handler flag_handlers[] = {
 };
 
 static const KshParamTypeInfo param_types[] = {
-    [KSH_PARAM_TYPE_STR] = { "str", (ParamParser) str_parser },
-    [KSH_PARAM_TYPE_INT] = { "int", (ParamParser) int_parser }
+    [KSH_PARAM_TYPE_STR] = { "<str>", (ParamParser) str_parser },
+    [KSH_PARAM_TYPE_INT] = { "<int>", (ParamParser) int_parser }
 };
 
 static const KshArgKindInfo arg_kinds[] = {
@@ -326,6 +330,64 @@ static bool store_bool_fh(bool *self, KshParser *p)
 static bool help_fh(const char *self, KshParser *p)
 {
     (void) p;
-    printf("[description]: %s\n", self);
+
+    size_t ctr;
+    union {
+        KshParams as_ps;
+        KshFlags as_fs;
+        KshSubcmds as_ss;
+    } args;
+
+    printf("[description]\n   %s\n", self);
+
+
+    args.as_ps = p->params;
+    if (args.as_ps.count > 0) {
+        putchar('\n');
+        printf("[parameters]\n");
+        for (ctr = 0; ctr < args.as_ps.count; ctr++) {
+            printf("   ");
+            print_param_usage(args.as_ps.items[ctr]);
+        }
+    }
+
+    args.as_fs = p->flags;
+    if (args.as_fs.count > 0) {
+        putchar('\n');
+        printf("[flags]\n");
+        for (ctr = 0; ctr < args.as_fs.count; ctr++) {
+            printf("   ");
+            print_flag_usage(args.as_fs.items[ctr]);
+        }
+    }
+
+    args.as_ss = p->subcmds;
+    if (args.as_ss.count > 0) {
+        putchar('\n');
+        printf("[subcmds]\n");
+        for (ctr = 0; ctr < args.as_ss.count; ctr++) {
+            printf("   ");
+            print_subcmd_usage(args.as_ss.items[ctr]);
+        }
+    }
+
     return false;
+}
+
+static void print_param_usage(KshParam p)
+{
+    printf("-%s %-10s%s\n",
+           p.base.name.items,
+           param_types[p.type].tostr,
+           p.base.usage);
+}
+
+static void print_flag_usage(KshFlag f)
+{
+    printf("-%-12s%s\n", f.base.name.items, f.base.usage);
+}
+
+static void print_subcmd_usage(KshSubcmd s)
+{
+    printf("%-13s%s\n", s.base.name.items, s.base.usage);
 }
