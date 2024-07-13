@@ -40,11 +40,18 @@ static bool subcmd_handler(KshSubcmd *self, KshParser *p);
 static bool str_parser(Token t, StrView *re, size_t idx);
 static bool int_parser(Token t, int *res, size_t idx);
 
+static bool store_bool_fh(bool *self, KshParser *p);
+static bool help_fh(const char *self, KshParser *p);
 
 
 static const char *param_type_str[] = {
     [KSH_PARAM_TYPE_STR] = "str",
     [KSH_PARAM_TYPE_INT] = "int"
+};
+
+static const Handler flag_handlers[] = {
+    [KSH_FLAG_TYPE_STORE_BOOL] = (Handler) store_bool_fh,
+    [KSH_FLAG_TYPE_HELP]       = (Handler) help_fh
 };
 
 static const ParamParser parsers[] = {
@@ -279,14 +286,13 @@ static bool param_handler(KshParam *self, KshParser *p)
 
 static bool flag_handler(KshFlag *self, KshParser *p)
 {
-    (void) p;
-    return (*self->var = true);
+    return flag_handlers[self->type](self->var, p);
 }
 
 static bool subcmd_handler(KshSubcmd *self, KshParser *p)
 {
     self->fn(p);
-    return !p->err[0];
+    return false;
 }
 
 static bool str_parser(Token t, StrView *res, size_t idx)
@@ -310,4 +316,17 @@ static bool int_parser(Token t, int *res, size_t idx)
 
     res[idx] = num;
     return true;
+}
+
+static bool store_bool_fh(bool *self, KshParser *p)
+{
+    (void) p;
+    return (*self = true);
+}
+
+static bool help_fh(const char *self, KshParser *p)
+{
+    (void) p;
+    printf("[description]: %s\n", self);
+    return false;
 }

@@ -55,9 +55,15 @@ typedef struct {
     size_t count;
 } KshParams;
 
+typedef enum {
+    KSH_FLAG_TYPE_STORE_BOOL,
+    KSH_FLAG_TYPE_HELP,
+} KshFlagType;
+
 typedef struct {
     KshArg base;
-    bool *var;
+    KshFlagType type;
+    void *var;
 } KshFlag;
 
 typedef struct {
@@ -94,12 +100,14 @@ typedef struct KshParser {
 
 #define KSH_SUBCMD(fn, descr) { { STRV_LIT(#fn), descr }, fn }
 
-#define KSH_STORE(var, usage) _Generic(var,                        \
-    StrView:  KSH_PARAM(KSH_PARAM_TYPE_STR, var, usage),           \
-    StrView*: KSH_PARAM(KSH_PARAM_TYPE_STR, var, usage),           \
-    int:      KSH_PARAM(KSH_PARAM_TYPE_INT, var, usage),           \
-    int*:     KSH_PARAM(KSH_PARAM_TYPE_INT, var, usage),           \
-    bool:     (KshFlag){ { STRV_LIT(#var), usage }, (bool*)&var }) \
+#define KSH_HELP(descr) { { STRV_LIT("help"), "displays this help" }, KSH_FLAG_TYPE_HELP, descr }
+
+#define KSH_STORE(var, usage) _Generic(var,                                                  \
+    StrView:  KSH_PARAM(KSH_PARAM_TYPE_STR, var, usage),                                     \
+    StrView*: KSH_PARAM(KSH_PARAM_TYPE_STR, var, usage),                                     \
+    int:      KSH_PARAM(KSH_PARAM_TYPE_INT, var, usage),                                     \
+    int*:     KSH_PARAM(KSH_PARAM_TYPE_INT, var, usage),                                     \
+    bool:     (KshFlag){ { STRV_LIT(#var), usage }, KSH_FLAG_TYPE_STORE_BOOL, &var }) \
 
 #define KSH_PARAM_TYPE(var) _Generic(var, \
     StrView:  KSH_PARAM_TYPE_STR,         \

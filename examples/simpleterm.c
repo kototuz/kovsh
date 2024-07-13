@@ -16,6 +16,7 @@ static int print(KshParser *parser)
         KSH_STORE(n, "count")
     );
     KSH_FLAGS(parser,
+        KSH_HELP("prints amazing messages"),
         KSH_STORE(dec, "decorativly?"),
     );
     if (!ksh_parse(parser)) return 0;
@@ -38,9 +39,12 @@ static int root(KshParser *parser)
         KSH_SUBCMD(print, "prints messages")
     );
 
-    if (!ksh_parse(parser) && parser->err[0]) {
-        fprintf(stderr, "error: %s\n", parser->err);
-        return 1;
+    if (!ksh_parse(parser)) {
+        if (parser->err[0]) {
+            fprintf(stderr, "error: %s\n", parser->err);
+            return 1;
+        }
+        return 0;
     }
 
     return 0;
