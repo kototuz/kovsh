@@ -90,9 +90,16 @@ typedef struct KshParser {
 #define KSH_FLAGS(p, ...) p->flags = (KshFlags){ (KshFlag[]){__VA_ARGS__}, sizeof((KshFlag[]){__VA_ARGS__})/sizeof(KshFlag) }
 #define KSH_SUBCMDS(p, ...) p->subcmds = (KshSubcmds){ (KshSubcmd[]){__VA_ARGS__}, sizeof((KshSubcmd[]){__VA_ARGS__})/sizeof(KshSubcmd) }
 
-#define KSH_PARAM(var, usage)  { { STRV_LIT(#var), usage }, KSH_PARAM_TYPE(var), sizeof(var)/(KSH_TYPESIZE(var)), &var }
-#define KSH_FLAG(var, usage)   { { STRV_LIT(#var), usage }, &var }
-#define KSH_SUBCMD(var, usage) { { STRV_LIT(#var), usage }, var }
+#define KSH_PARAM(PT, var, usage) (KshParam){ { STRV_LIT(#var), usage }, PT, sizeof(var)/(KSH_TYPESIZE(var)), &var }
+
+#define KSH_SUBCMD(fn, descr) { { STRV_LIT(#fn), descr }, fn }
+
+#define KSH_STORE(var, usage) _Generic(var,                        \
+    StrView:  KSH_PARAM(KSH_PARAM_TYPE_STR, var, usage),           \
+    StrView*: KSH_PARAM(KSH_PARAM_TYPE_STR, var, usage),           \
+    int:      KSH_PARAM(KSH_PARAM_TYPE_INT, var, usage),           \
+    int*:     KSH_PARAM(KSH_PARAM_TYPE_INT, var, usage),           \
+    bool:     (KshFlag){ { STRV_LIT(#var), usage }, (bool*)&var }) \
 
 #define KSH_PARAM_TYPE(var) _Generic(var, \
     StrView:  KSH_PARAM_TYPE_STR,         \

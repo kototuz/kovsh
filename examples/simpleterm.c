@@ -12,11 +12,11 @@ static int print(KshParser *parser)
     StrView m;
     int n = 1;
     KSH_PARAMS(parser,
-        KSH_PARAM(m, "message"),
-        KSH_PARAM(n, "count")
+        KSH_STORE(m, "message"),
+        KSH_STORE(n, "count")
     );
     KSH_FLAGS(parser,
-        KSH_FLAG(dec, "decorativly")
+        KSH_STORE(dec, "decorativly?"),
     );
     if (!ksh_parse(parser)) return 0;
 
