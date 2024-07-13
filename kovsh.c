@@ -103,6 +103,9 @@ bool ksh_parse_cmd(KshParser *p, StrView cmd)
 {
     p->err[0] = '\0';
     p->lex = (Lexer){ .text = cmd };
+    p->params = (KshParams){0};
+    p->flags = (KshFlags){0};
+    p->subcmds = (KshSubcmds){0};
     p->root(p);
     return true;
 }
