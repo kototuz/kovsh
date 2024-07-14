@@ -124,5 +124,6 @@ typedef struct KshParser {
 
 bool ksh_parse(KshParser *p);
 bool ksh_parse_cmd(KshParser *p, StrView cmd);
+bool ksh_parse_cargs(KshParser *p, int argc, char **argv);
 
 #endif

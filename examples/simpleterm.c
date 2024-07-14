@@ -58,7 +58,7 @@ static int root(KshParser *parser)
     return 0;
 }
 
-int main()
+int main(void)
 {
     char buf[100];
     KshParser parser = { .root = root };

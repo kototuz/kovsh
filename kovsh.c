@@ -114,6 +114,15 @@ bool ksh_parse_cmd(KshParser *p, StrView cmd)
     return true;
 }
 
+bool ksh_parse_cargs(KshParser *p, int argc, char **argv)
+{
+    argv++;
+    argc--;
+    p->err[0] = '\0';
+    p->lex = (KshLexer){ .text.len = argc, .text.items = (char *)argv, .cargs = true };
+    return ksh_parse(p);
+}
+
 bool ksh_parse(KshParser *p)
 {
     StrView value;
@@ -162,7 +171,7 @@ static bool ksh_lex_peek(KshLexer *l, StrView *res)
 
     StrView text;
     if (l->cargs) {
-        text.items = *(char **)(l->text.items+1);
+        text.items = *(char **)l->text.items;
         text.len = strlen(text.items);
         l->buf = *res = text;
     } else {
@@ -199,7 +208,7 @@ static bool ksh_lex_next(KshLexer *l, StrView *res)
     else ret = ksh_lex_peek(l, res);
 
     if (l->cargs) {
-        l->text.items++;
+        l->text.items = (char*)((char**)l->text.items+1);
         l->text.len--;
     } else {
         l->text.items += l->buf.len;
