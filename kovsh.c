@@ -33,8 +33,8 @@ typedef struct {
 
 
 // TODO: refactor the lexer
-static bool lex_peek(Lexer *l);
-static bool lex_next(Lexer *l);
+static bool lex_peek(KshLexer *l);
+static bool lex_next(KshLexer *l);
 
 static bool isstr(int s);
 static bool isend(int s);
@@ -101,14 +101,14 @@ bool strv_eq(StrView sv1, StrView sv2)
 int ksh_parser_parse_cmd(KshParser *parser, KshCommandFn root, StrView input)
 {
     parser->err[0] = '\0';
-    parser->lex = (Lexer){ .text = input };
+    parser->lex = (KshLexer){ .text = input };
     return root(parser);
 }
 
 bool ksh_parse_cmd(KshParser *p, StrView cmd)
 {
     p->err[0] = '\0';
-    p->lex = (Lexer){ .text = cmd };
+    p->lex = (KshLexer){ .text = cmd };
     parser_reset_args(p);
     p->root(p);
     return true;
@@ -152,7 +152,7 @@ bool ksh_parse(KshParser *p)
 
 
 
-static bool lex_peek(Lexer *l)
+static bool lex_peek(KshLexer *l)
 {
     if (l->is_peek) return true;
 
@@ -180,7 +180,7 @@ static bool lex_peek(Lexer *l)
     return true;
 }
 
-static bool lex_next(Lexer *l)
+static bool lex_next(KshLexer *l)
 {
     if (l->is_peek) {
         l->cursor += l->cur_tok.len;
@@ -225,7 +225,7 @@ static void parser_reset_args(KshParser *self)
 static KshArg *parser_find_arg(KshParser *self, KshArgKind kind, StrView name)
 {
     // KshParser {
-    //   Lexer lex;
+    //   KshLexer lex;
     //   KshParams params;   \ <- as arrays;
     //   KshFlags flags;     |
     //   KshSubcmds subcmds; /

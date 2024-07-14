@@ -31,7 +31,7 @@ typedef struct {
     size_t cursor;
     Token cur_tok;
     bool is_peek;
-} Lexer;
+} KshLexer;
 
 typedef struct {
     StrView name;
@@ -85,7 +85,7 @@ typedef struct {
 } KshSubcmds;
 
 typedef struct KshParser {
-    Lexer lex;
+    KshLexer lex;
     KshParams params;
     KshFlags flags;
     KshSubcmds subcmds;
