@@ -30,12 +30,9 @@ typedef struct {
 
 
 
+// TODO: refactor the lexer
 static bool lex_peek(Lexer *l);
 static bool lex_next(Lexer *l);
-static bool lex_next_if(Lexer *l, Token expected);
-static bool lex_next_if_pred(Lexer *l, bool (*predicate)(Token));
-
-static bool is_multiopt(StrView sv);
 
 static bool isstr(int s);
 static bool isend(int s);
@@ -210,27 +207,6 @@ static bool lex_next(Lexer *l)
     }
 
     return false;
-}
-
-static bool lex_next_if(Lexer *l, Token expected)
-{
-    return lex_peek(l)                   &&
-           strv_eq(l->cur_tok, expected) &&
-           lex_next(l);
-}
-
-static bool lex_next_if_pred(Lexer *l, bool (*predicate)(Token))
-{
-    return lex_peek(l)           &&
-           predicate(l->cur_tok) &&
-           lex_next(l);
-}
-
-static bool is_multiopt(StrView sv)
-{
-    return sv.len > 2         &&
-           sv.items[0] == '-' &&
-           sv.items[1] != '-';
 }
 
 static bool isstr(int s)
