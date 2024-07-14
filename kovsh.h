@@ -28,9 +28,8 @@ bool    strv_eq(StrView sv1, StrView sv2);
 
 typedef struct {
     StrView text;
-    size_t cursor;
-    Token cur_tok;
-    bool is_peek;
+    StrView buf;
+    bool cargs;
 } KshLexer;
 
 typedef struct {

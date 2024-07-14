@@ -33,8 +33,8 @@ typedef struct {
 
 
 // TODO: refactor the lexer
-static bool lex_peek(KshLexer *l);
-static bool lex_next(KshLexer *l);
+static bool ksh_lex_peek(KshLexer *l, StrView *res);
+static bool ksh_lex_next(KshLexer *l, StrView *res);
 
 static bool isstr(int s);
 static bool isend(int s);
@@ -116,15 +116,15 @@ bool ksh_parse_cmd(KshParser *p, StrView cmd)
 
 bool ksh_parse(KshParser *p)
 {
+    StrView value;
     StrView arg_name;
     KshArgKind arg_kind;
 
-    while (lex_next(&p->lex)) {
-        arg_name = p->lex.cur_tok;
+    while (ksh_lex_next(&p->lex, &arg_name)) {
         if (arg_name.items[0] == '-') {
             arg_name.items += 1;
             arg_name.len -= 1;
-            if (lex_peek(&p->lex) && p->lex.cur_tok.items[0] != '-') {
+            if (ksh_lex_peek(&p->lex, &value) && value.items[0] != '-') {
                 arg_kind = KSH_ARG_KIND_PARAM;
             } else {
                 arg_kind = KSH_ARG_KIND_FLAG;
@@ -152,50 +152,62 @@ bool ksh_parse(KshParser *p)
 
 
 
-static bool lex_peek(KshLexer *l)
+static bool ksh_lex_peek(KshLexer *l, StrView *res)
 {
-    if (l->is_peek) return true;
-
-    Token result = { .items = &l->text.items[l->cursor] };
-
-    if (isend(result.items[0])) return false;
-
-    if (isspace(result.items[0])) {
-        while (isspace(result.items[++result.len]));
-        l->cursor += result.len;
-        result.items = &result.items[result.len];
-        result.len = 0;
+    if (l->text.len == 0) return false;
+    if (l->buf.items) {
+        *res = l->buf;
+        return true;
     }
 
-    if (isstr(result.items[0])) {
-        int pairsymbol = result.items[0];
-        while (result.items[++result.len] != pairsymbol)
-            if (isend(result.items[result.len])) return false;
-        result.len++;
-    } else
-        while (!isbound(result.items[++result.len]));
+    StrView text;
+    if (l->cargs) {
+        text.items = *(char **)(l->text.items+1);
+        text.len = strlen(text.items);
+        l->buf = *res = text;
+    } else {
+        text = l->text;
+        if (isspace(*text.items)) {
+            text.len--;
+            while (isspace(*++text.items))
+                text.len--;
+        }
+        l->text.len = text.len;
+        l->text.items = text.items;
+        text.len = 0;
 
-    l->is_peek = true;
-    l->cur_tok = result;
+        if (isend(*text.items)) return false;
+
+        if (isstr(*text.items)) {
+            int pairsymbol = *text.items;
+            while (text.items[++text.len] != pairsymbol)
+                if (isend(text.items[text.len])) return false;
+            text.len++;
+        } else
+            while (!isbound(text.items[++text.len]));
+
+        l->buf = *res = text;
+    }
+
     return true;
 }
 
-static bool lex_next(KshLexer *l)
+static bool ksh_lex_next(KshLexer *l, StrView *res)
 {
-    if (l->is_peek) {
-        l->cursor += l->cur_tok.len;
-        l->is_peek = false;
-        return true;
+    bool ret = true;
+    if (l->buf.items) *res = l->buf;
+    else ret = ksh_lex_peek(l, res);
+
+    if (l->cargs) {
+        l->text.items++;
+        l->text.len--;
+    } else {
+        l->text.items += l->buf.len;
+        l->text.len -= l->buf.len;
     }
 
-    l->cur_tok = (Token){0};
-    if (lex_peek(l)) {
-        l->cursor += l->cur_tok.len;
-        l->is_peek = false;
-        return true;
-    }
-
-    return false;
+    l->buf = (StrView){0};
+    return ret;
 }
 
 static bool isstr(int s)
@@ -248,7 +260,8 @@ static KshArg *parser_find_arg(KshParser *self, KshArgKind kind, StrView name)
 
 static bool param_handler(KshParam *self, KshParser *p)
 {
-    if (!lex_next(&p->lex)) {
+    StrView val;
+    if (!ksh_lex_next(&p->lex, &val)) {
         sprintf(p->err, "at least 1 param is required");
         return false;
     }
@@ -256,17 +269,17 @@ static bool param_handler(KshParam *self, KshParser *p)
     KshParamTypeInfo pt_info = param_types[self->type];
     size_t count = self->max-1;
     do {
-        if (!pt_info.parser(p->lex.cur_tok, self->var, count)) {
+        if (!pt_info.parser(val, self->var, count)) {
             sprintf(p->err,
                     "`"STRV_FMT"` is not a %s",
-                    STRV_ARG(p->lex.cur_tok),
+                    STRV_ARG(val),
                     pt_info.tostr);
             return false;
         }
     } while (
         count-- != 0                   &&
-        lex_next(&p->lex)              &&
-        p->lex.cur_tok.items[0] != '-' 
+        ksh_lex_next(&p->lex, &val)    &&
+        val.items[0] != '-' 
     );
 
     return true;
