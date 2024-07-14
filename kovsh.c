@@ -5,9 +5,10 @@
 #include <stdint.h>
 
 typedef enum {
-    KSH_ARG_KIND_FLAG,
     KSH_ARG_KIND_PARAM,
-    KSH_ARG_KIND_SUBCMD
+    KSH_ARG_KIND_FLAG,
+    KSH_ARG_KIND_SUBCMD,
+    KSH_ARG_KIND_COUNT
 } KshArgKind;
 
 typedef struct {
@@ -21,6 +22,7 @@ typedef bool (*Handler)(void *self, KshParser *p);
 typedef struct {
     const char *tostr;
     Handler handler;
+    size_t size;
 } KshArgKindInfo;
 
 typedef struct {
@@ -39,7 +41,7 @@ static bool isend(int s);
 static bool isbound(int s);
 
 static void parser_reset_args(KshParser *self);
-static KshArg *find_arg(Bytes bts, size_t itsize, StrView name);
+static KshArg *parser_find_arg(KshParser *self, KshArgKind kind, StrView name);
 
 static bool param_handler(KshParam *self, KshParser *p);
 static bool flag_handler(KshFlag *self, KshParser *p);
@@ -70,9 +72,9 @@ static const KshParamTypeInfo param_types[] = {
 };
 
 static const KshArgKindInfo arg_kinds[] = {
-    [KSH_ARG_KIND_PARAM]  = { "parameter", (Handler) param_handler },
-    [KSH_ARG_KIND_FLAG]   = { "flag", (Handler) flag_handler },
-    [KSH_ARG_KIND_SUBCMD] = { "subcommand", (Handler) subcmd_handler }
+    [KSH_ARG_KIND_PARAM]  = { "parameter", (Handler) param_handler, sizeof(KshParam) },
+    [KSH_ARG_KIND_FLAG]   = { "flag", (Handler) flag_handler, sizeof(KshFlag) },
+    [KSH_ARG_KIND_SUBCMD] = { "subcommand", (Handler) subcmd_handler, sizeof(KshSubcmd) }
 };
 
 
@@ -116,13 +118,6 @@ bool ksh_parse(KshParser *p)
 {
     StrView arg_name;
     KshArgKind arg_kind;
-    size_t item_size;
-    union {
-        KshParams as_params;
-        KshFlags as_flags;
-        KshSubcmds as_subcmds;
-        Bytes as_bytes;
-    } source;
 
     while (lex_next(&p->lex)) {
         arg_name = p->lex.cur_tok;
@@ -130,31 +125,25 @@ bool ksh_parse(KshParser *p)
             arg_name.items += 1;
             arg_name.len -= 1;
             if (lex_peek(&p->lex) && p->lex.cur_tok.items[0] != '-') {
-                item_size = sizeof(KshParam);
-                source.as_params = p->params;
                 arg_kind = KSH_ARG_KIND_PARAM;
             } else {
-                item_size = sizeof(KshFlag);
-                source.as_flags = p->flags;
                 arg_kind = KSH_ARG_KIND_FLAG;
             }
         } else {
-            source.as_subcmds = p->subcmds;
             arg_kind = KSH_ARG_KIND_SUBCMD;
-            item_size = sizeof(KshSubcmd);
         }
 
-        const KshArgKindInfo arg_kind_info = arg_kinds[arg_kind];
-        KshArg *arg = find_arg(source.as_bytes, item_size, arg_name);
+        const KshArgKindInfo ak_info = arg_kinds[arg_kind];
+        KshArg *arg = parser_find_arg(p, arg_kind, arg_name);
         if (!arg) {
             sprintf(p->err,
                     "%s `"STRV_FMT"` not found",
-                    arg_kind_info.tostr,
+                    ak_info.tostr,
                     STRV_ARG(arg_name));
             return false;
         }
 
-        if (!arg_kind_info.handler(arg, p)) return false;
+        if (!ak_info.handler(arg, p)) return false;
     }
 
     parser_reset_args(p);
@@ -233,12 +222,23 @@ static void parser_reset_args(KshParser *self)
     self->subcmds = (KshSubcmds){0};
 }
 
-static KshArg *find_arg(Bytes bts, size_t itsize, StrView name)
+static KshArg *parser_find_arg(KshParser *self, KshArgKind kind, StrView name)
 {
-    for (size_t i = 0; i < bts.count; i++) {
-        bts.items += i*itsize;
-        if (strv_eq(name, ((KshArg*)bts.items)->name))
-            return (KshArg*)bts.items;
+    // KshParser {
+    //   Lexer lex;
+    //   KshParams params;   \ <- as arrays;
+    //   KshFlags flags;     |
+    //   KshSubcmds subcmds; /
+    //   KshCommandFn root;
+    //   KshErr err;
+    // }  
+    Bytes grp = (*((Bytes (*)[KSH_ARG_KIND_COUNT])&self->params))[kind];
+    size_t itsize = arg_kinds[kind].size;
+    for (size_t i = 0; i < grp.count; i++) {
+        grp.items += i*itsize;
+        if (strv_eq(name, ((KshArg*)grp.items)->name)) {
+            return (KshArg*)grp.items;
+        }
     }
 
     return NULL;
