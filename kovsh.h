@@ -92,9 +92,9 @@ typedef struct KshParser {
     KshCommandFn root;
 } KshParser;
 
-#define KSH_PARAMS(p, ...) p->params = (KshParams){ (KshParam[]){__VA_ARGS__}, sizeof((KshParam[]){__VA_ARGS__})/sizeof(KshParam) }
-#define KSH_FLAGS(p, ...) p->flags = (KshFlags){ (KshFlag[]){__VA_ARGS__}, sizeof((KshFlag[]){__VA_ARGS__})/sizeof(KshFlag) }
-#define KSH_SUBCMDS(p, ...) p->subcmds = (KshSubcmds){ (KshSubcmd[]){__VA_ARGS__}, sizeof((KshSubcmd[]){__VA_ARGS__})/sizeof(KshSubcmd) }
+#define KSH_PARAMS(p, ...) (p)->params = (KshParams){ (KshParam[]){__VA_ARGS__}, sizeof((KshParam[]){__VA_ARGS__})/sizeof(KshParam) }
+#define KSH_FLAGS(p, ...) (p)->flags = (KshFlags){ (KshFlag[]){__VA_ARGS__}, sizeof((KshFlag[]){__VA_ARGS__})/sizeof(KshFlag) }
+#define KSH_SUBCMDS(p, ...) (p)->subcmds = (KshSubcmds){ (KshSubcmd[]){__VA_ARGS__}, sizeof((KshSubcmd[]){__VA_ARGS__})/sizeof(KshSubcmd) }
 
 #define KSH_PARAM(PT, var, usage) (KshParam){ { STRV_LIT(#var), usage }, PT, sizeof(var)/(KSH_TYPESIZE(var)), &var }
 
