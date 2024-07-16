@@ -8,7 +8,7 @@
 static int flot(KshParser *p)
 {
     float v;
-    KSH_PARAMS(p, KSH_STORE(v, "float"));
+    p->params = KSH_PARAMS(KSH_STORE(v, "float"));
     if (!ksh_parse(p)) return 0;
 
     printf("%f\n", v);
@@ -19,7 +19,7 @@ static int flot(KshParser *p)
 static int str(KshParser *p)
 {
     StrView v;
-    KSH_PARAMS(p, KSH_STORE(v, "str"));
+    p->params = KSH_PARAMS(KSH_STORE(v, "str"));
     if (!ksh_parse(p)) return 0;
 
     printf(STRV_FMT"\n", STRV_ARG(v));
@@ -29,8 +29,8 @@ static int str(KshParser *p)
 
 static int print(KshParser *parser)
 {
-    KSH_FLAGS(parser, KSH_HELP("printer powered by KOVSH"));
-    KSH_SUBCMDS(parser,
+    parser->flags = KSH_FLAGS(KSH_HELP("printer powered by KOVSH"));
+    parser->subcmds = KSH_SUBCMDS(
         KSH_SUBCMD(flot, "print float"),
         KSH_SUBCMD(str, "print str")
     );
@@ -40,12 +40,8 @@ static int print(KshParser *parser)
 
 static int root(KshParser *parser)
 {
-    KSH_SUBCMDS(parser,
-        KSH_SUBCMD(print, "prints messages"),
-    );
-    KSH_FLAGS(parser,
-        KSH_HELP("a simple terminal powered by KOVSH")
-    );
+    parser->flags = KSH_FLAGS(KSH_HELP("a simple terminal powered by KOVSH"));
+    parser->subcmds = KSH_SUBCMDS(KSH_SUBCMD(print, "a printer"));
 
     if (!ksh_parse(parser)) {
         if (parser->err[0]) {
