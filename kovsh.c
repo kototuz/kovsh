@@ -62,6 +62,8 @@ static void print_param_usage(KshParam p);
 static void print_flag_usage(KshFlag f);
 static void print_subcmd_usage(KshSubcmd s);
 
+static void parser_check_params(KshParser *p);
+
 
 
 static jmp_buf ksh_exit;
@@ -160,6 +162,8 @@ void ksh_parse_args(KshParser *p)
 
         ak_info.handler(arg, p);
     }
+
+    parser_check_params(p);
 }
 
 
@@ -288,6 +292,7 @@ static void param_handler(KshParam *self, KshParser *p)
                     pt_info.tostr);
             longjmp(ksh_exit, KSH_EXIT_ERR);
         }
+        self->assigned = true;
     } while (
         count-- != 0                   &&
         ksh_lex_next(&p->lex, &val)    &&
@@ -423,4 +428,16 @@ static void print_flag_usage(KshFlag f)
 static void print_subcmd_usage(KshSubcmd s)
 {
     printf("%-13s%s\n", s.base.name.items, s.base.usage);
+}
+
+static void parser_check_params(KshParser *p)
+{
+    KshParams params = p->params;
+    for (size_t i = 0; i < params.count; i++) {
+        if (!params.items[i].assigned) {
+            sprintf(p->err, "parameter `"STRV_FMT"` must be assigned",
+                    STRV_ARG(params.items[i].base.name));
+            longjmp(ksh_exit, KSH_EXIT_ERR);
+        }
+    }
 }

@@ -6,8 +6,8 @@ static int main2(KshParser *p)
     StrView m = STRV_LIT("hello");
     StrView c = STRV_LIT("\033[31m");
     p->params = KSH_PARAMS(
-        KSH_STORE(m, "message"),
-        KSH_STORE(c, "color")
+        KSH_PARAM_O(m, "message"),
+        KSH_PARAM_O(c, "color")
     );
     ksh_parse_args(p);
 

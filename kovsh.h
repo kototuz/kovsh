@@ -48,6 +48,7 @@ typedef struct {
     KshParamType type;
     size_t max;
     void *var;
+    bool assigned;
 } KshParam;
 
 typedef struct {
@@ -96,26 +97,21 @@ typedef struct KshParser {
 #define KSH_FLAGS(...)   (KshFlags){ (KshFlag[]){__VA_ARGS__}, sizeof((KshFlag[]){__VA_ARGS__})/sizeof(KshFlag) }
 #define KSH_SUBCMDS(...) (KshSubcmds){ (KshSubcmd[]){__VA_ARGS__}, sizeof((KshSubcmd[]){__VA_ARGS__})/sizeof(KshSubcmd) }
 
-#define KSH_PARAM(PT, var, usage) (KshParam){ { STRV_LIT(#var), usage }, PT, sizeof(var)/(KSH_TYPESIZE(var)), &var }
+#define KSH_PARAM(var, usage)  { { STRV_LIT(#var), usage }, KSH_PARAM_TYPE(var), sizeof(var)/(KSH_TYPESIZE(var)), &var, false }
+#define KSH_PARAM_O(var, usage) { { STRV_LIT(#var), usage }, KSH_PARAM_TYPE(var), sizeof(var)/(KSH_TYPESIZE(var)), &var, true }
 
-#define KSH_SUBCMD(fn, descr) { { STRV_LIT(#fn), descr }, fn }
-
+#define KSH_FLAG(var, usage) { { STRV_LIT(#var), usage }, KSH_FLAG_TYPE_STORE_BOOL, &var }
 #define KSH_HELP(descr) { { STRV_LIT("help"), "displays this help" }, KSH_FLAG_TYPE_HELP, descr }
 
-#define KSH_STORE(var, usage) _Generic(var,                                                  \
-    StrView:  KSH_PARAM(KSH_PARAM_TYPE_STR, var, usage),                                     \
-    StrView*: KSH_PARAM(KSH_PARAM_TYPE_STR, var, usage),                                     \
-    int:      KSH_PARAM(KSH_PARAM_TYPE_INT, var, usage),                                     \
-    int*:     KSH_PARAM(KSH_PARAM_TYPE_INT, var, usage),                                     \
-    float:    KSH_PARAM(KSH_PARAM_TYPE_FLOAT, var, usage),                                   \
-    float*:   KSH_PARAM(KSH_PARAM_TYPE_FLOAT, var, usage),                                   \
-    bool:     (KshFlag){ { STRV_LIT(#var), usage }, KSH_FLAG_TYPE_STORE_BOOL, &var })        \
+#define KSH_SUBCMD(fn, descr) { { STRV_LIT(#fn), descr }, fn }
 
 #define KSH_PARAM_TYPE(var) _Generic(var, \
     StrView:  KSH_PARAM_TYPE_STR,         \
     StrView*: KSH_PARAM_TYPE_STR,         \
     int:      KSH_PARAM_TYPE_INT,         \
-    int*:     KSH_PARAM_TYPE_INT)         \
+    int*:     KSH_PARAM_TYPE_INT,         \
+    float:    KSH_PARAM_TYPE_FLOAT,       \
+    float*:   KSH_PARAM_TYPE_FLOAT)       \
 
 #define KSH_TYPESIZE(var) _Generic(var, \
     int*: sizeof(int),                  \

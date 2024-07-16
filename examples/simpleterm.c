@@ -8,7 +8,7 @@
 static int flot(KshParser *p)
 {
     float v;
-    p->params = KSH_PARAMS(KSH_STORE(v, "float"));
+    p->params = KSH_PARAMS(KSH_PARAM(v, "float"));
     ksh_parse_args(p);
 
     printf("%f\n", v);
@@ -19,7 +19,7 @@ static int flot(KshParser *p)
 static int str(KshParser *p)
 {
     StrView v;
-    p->params = KSH_PARAMS(KSH_STORE(v, "str"));
+    p->params = KSH_PARAMS(KSH_PARAM(v, "str"));
     ksh_parse_args(p);
 
     printf(STRV_FMT"\n", STRV_ARG(v));
