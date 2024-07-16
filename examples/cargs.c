@@ -4,9 +4,23 @@
 static int main2(KshParser *p)
 {
     StrView m = STRV_LIT("hello");
-    p->params = KSH_PARAMS(KSH_STORE(m, "message"));
+    StrView c = STRV_LIT("\033[31m");
+    p->params = KSH_PARAMS(
+        KSH_STORE(m, "message"),
+        KSH_STORE(c, "color")
+    );
     ksh_parse_args(p);
-    printf(STRV_FMT"\n", STRV_ARG(m));
+
+    if (strv_eq(c, STRV_LIT("green"))) {
+        c = STRV_LIT("\033[32m");
+    } else if (strv_eq(c, STRV_LIT("red"))) {
+        c = STRV_LIT("\033[31m");
+    }
+
+    printf(STRV_FMT""STRV_FMT"\n",
+           STRV_ARG(c),
+           STRV_ARG(m));
+
     return 0;
 }
 
