@@ -160,8 +160,6 @@ void ksh_parse_args(KshParser *p)
 
         ak_info.handler(arg, p);
     }
-
-    parser_reset_args(p);
 }
 
 
