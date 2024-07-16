@@ -122,8 +122,9 @@ typedef struct KshParser {
     StrView*: sizeof(StrView),          \
     default: sizeof(var))               \
 
-bool ksh_parse(KshParser *p);
-bool ksh_parse_cmd(KshParser *p, StrView cmd);
-bool ksh_parse_cargs(KshParser *p, int argc, char **argv);
+void ksh_init_from_strv(KshParser *p, StrView strv);
+void ksh_init_from_cargs(KshParser *p, int argc, char **argv);
+bool ksh_parse_cmd(KshParser *p, KshCommandFn root_fn);
+void ksh_parse_args(KshParser *p);
 
 #endif

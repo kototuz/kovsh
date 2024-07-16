@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <setjmp.h>
 
 typedef enum {
     KSH_ARG_KIND_PARAM,
@@ -11,13 +12,18 @@ typedef enum {
     KSH_ARG_KIND_COUNT
 } KshArgKind;
 
+typedef enum {
+    KSH_EXIT_ERR = 1,
+    KSH_EXIT_EARLY
+} KshExit;
+
 typedef struct {
     uint8_t *items;
     size_t count;
 } Bytes;
 
 typedef bool (*ParamParser)(Token t, void *res, size_t idx);
-typedef bool (*Handler)(void *self, KshParser *p);
+typedef void (*Handler)(void *self, KshParser *p);
 
 typedef struct {
     const char *tostr;
@@ -43,27 +49,22 @@ static bool isbound(int s);
 static void parser_reset_args(KshParser *self);
 static KshArg *parser_find_arg(KshParser *self, KshArgKind kind, StrView name);
 
-static bool param_handler(KshParam *self, KshParser *p);
-static bool flag_handler(KshFlag *self, KshParser *p);
-static bool subcmd_handler(KshSubcmd *self, KshParser *p);
+static void param_handler(KshParam *self, KshParser *p);
+static void flag_handler(KshFlag *self, KshParser *p);
+static void subcmd_handler(KshSubcmd *self, KshParser *p);
 
 static bool str_parser(Token t, StrView *re, size_t idx);
 static bool int_parser(Token t, int *res, size_t idx);
 static bool float_parser(Token t, float *res, size_t idx);
 
-static bool store_bool_fh(bool *self, KshParser *p);
-static bool help_fh(const char *self, KshParser *p);
-
+static void print_help(const char *descr, KshParser *p);
 static void print_param_usage(KshParam p);
 static void print_flag_usage(KshFlag f);
 static void print_subcmd_usage(KshSubcmd s);
 
 
 
-static const Handler flag_handlers[] = {
-    [KSH_FLAG_TYPE_STORE_BOOL] = (Handler) store_bool_fh,
-    [KSH_FLAG_TYPE_HELP]       = (Handler) help_fh
-};
+static jmp_buf ksh_exit;
 
 static const KshParamTypeInfo param_types[] = {
     [KSH_PARAM_TYPE_STR]   = { "<str>", (ParamParser) str_parser },
@@ -97,33 +98,38 @@ bool strv_eq(StrView sv1, StrView sv2)
 }
 
 
-
-int ksh_parser_parse_cmd(KshParser *parser, KshCommandFn root, StrView input)
+void ksh_init_from_strv(KshParser *p, StrView strv)
 {
-    parser->err[0] = '\0';
-    parser->lex = (KshLexer){ .text = input };
-    return root(parser);
+    p->lex = (KshLexer){ .text = strv };
 }
 
-bool ksh_parse_cmd(KshParser *p, StrView cmd)
-{
-    p->err[0] = '\0';
-    p->lex = (KshLexer){ .text = cmd };
-    parser_reset_args(p);
-    p->root(p);
-    return true;
-}
-
-bool ksh_parse_cargs(KshParser *p, int argc, char **argv)
+void ksh_init_from_cargs(KshParser *p, int argc, char **argv)
 {
     argv++;
     argc--;
-    p->err[0] = '\0';
-    p->lex = (KshLexer){ .text.len = argc, .text.items = (char *)argv, .cargs = true };
-    return ksh_parse(p);
+    p->lex = (KshLexer){ .text.items = (char *)argv, .text.len = argc, .cargs = true };
 }
 
-bool ksh_parse(KshParser *p)
+bool ksh_parse_cmd(KshParser *p, KshCommandFn root_fn)
+{
+    p->err[0] = '\0';
+    parser_reset_args(p);
+
+    KshExit ex = setjmp(ksh_exit);
+    switch (ex) {
+    case KSH_EXIT_ERR:
+        printf("ERROR: %s\n", p->err);
+        return false;
+    case KSH_EXIT_EARLY: return true;
+    default: break;
+    }
+
+    root_fn(p);
+
+    return true;
+}
+
+void ksh_parse_args(KshParser *p)
 {
     StrView value;
     StrView arg_name;
@@ -149,14 +155,13 @@ bool ksh_parse(KshParser *p)
                     "%s `"STRV_FMT"` not found",
                     ak_info.tostr,
                     STRV_ARG(arg_name));
-            return false;
+            longjmp(ksh_exit, KSH_EXIT_ERR);
         }
 
-        if (!ak_info.handler(arg, p)) return false;
+        ak_info.handler(arg, p);
     }
 
     parser_reset_args(p);
-    return true;
 }
 
 
@@ -267,12 +272,12 @@ static KshArg *parser_find_arg(KshParser *self, KshArgKind kind, StrView name)
 
 
 
-static bool param_handler(KshParam *self, KshParser *p)
+static void param_handler(KshParam *self, KshParser *p)
 {
     StrView val;
     if (!ksh_lex_next(&p->lex, &val)) {
         sprintf(p->err, "at least 1 param is required");
-        return false;
+        longjmp(ksh_exit, KSH_EXIT_ERR);
     }
 
     KshParamTypeInfo pt_info = param_types[self->type];
@@ -283,27 +288,32 @@ static bool param_handler(KshParam *self, KshParser *p)
                     "`"STRV_FMT"` is not a %s",
                     STRV_ARG(val),
                     pt_info.tostr);
-            return false;
+            longjmp(ksh_exit, KSH_EXIT_ERR);
         }
     } while (
         count-- != 0                   &&
         ksh_lex_next(&p->lex, &val)    &&
         val.items[0] != '-' 
     );
-
-    return true;
 }
 
-static bool flag_handler(KshFlag *self, KshParser *p)
+static void flag_handler(KshFlag *self, KshParser *p)
 {
-    return flag_handlers[self->type](self->var, p);
+    switch (self->type) {
+    case KSH_FLAG_TYPE_STORE_BOOL:
+        *(bool*)self->var = true;
+        break;
+    case KSH_FLAG_TYPE_HELP:
+        print_help(self->var, p);
+        longjmp(ksh_exit, KSH_EXIT_EARLY);
+    }
 }
 
-static bool subcmd_handler(KshSubcmd *self, KshParser *p)
+static void subcmd_handler(KshSubcmd *self, KshParser *p)
 {
     parser_reset_args(p);
     self->fn(p);
-    return false;
+    longjmp(ksh_exit, KSH_EXIT_EARLY);
 }
 
 static bool str_parser(Token t, StrView *res, size_t idx)
@@ -354,13 +364,7 @@ static bool float_parser(Token t, float *res, size_t idx)
     return true;
 }
 
-static bool store_bool_fh(bool *self, KshParser *p)
-{
-    (void) p;
-    return (*self = true);
-}
-
-static bool help_fh(const char *self, KshParser *p)
+static void print_help(const char *descr, KshParser *p)
 {
     (void) p;
 
@@ -371,7 +375,7 @@ static bool help_fh(const char *self, KshParser *p)
         KshSubcmds as_ss;
     } args;
 
-    printf("[description]\n   %s\n", self);
+    printf("[description]\n   %s\n", descr);
 
 
     args.as_ps = p->params;
@@ -403,8 +407,6 @@ static bool help_fh(const char *self, KshParser *p)
             print_subcmd_usage(args.as_ss.items[ctr]);
         }
     }
-
-    return false;
 }
 
 static void print_param_usage(KshParam p)
