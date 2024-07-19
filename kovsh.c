@@ -37,7 +37,6 @@ static bool isstr(int s);
 static bool isend(int s);
 static bool isbound(int s);
 
-static void parser_reset_args(KshParser *self);
 static KshArg *args_find_arg(Bytes arr, size_t it_size, StrView name);
 
 static void parse_param_val(KshParam *param, KshParser *p);
@@ -50,8 +49,6 @@ static void print_help(const char *descr, KshArgs args);
 static void print_param_usage(KshParam p);
 static void print_flag_usage(KshFlag f);
 static void print_subcmd_usage(KshSubcmd s);
-
-static void parser_check_params(KshParser *p);
 
 
 
