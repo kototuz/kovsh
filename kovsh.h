@@ -12,6 +12,12 @@
 #define STRV_FMT "%.*s"
 #define STRV_ARG(sv) (int) (sv).len, (sv).items
 
+#define KSH_ARR(T)    \
+    typedef struct {  \
+        T *items;     \
+        size_t count; \
+    } T##s            \
+
 #define MAX_ERR_MSG 100
 typedef char KshErr[MAX_ERR_MSG];
 
@@ -51,11 +57,6 @@ typedef struct {
     bool assigned;
 } KshParam;
 
-typedef struct {
-    KshParam *items;
-    size_t count;
-} KshParams;
-
 typedef enum {
     KSH_FLAG_TYPE_STORE_BOOL,
     KSH_FLAG_TYPE_HELP,
@@ -63,14 +64,8 @@ typedef enum {
 
 typedef struct {
     KshArg base;
-    KshFlagType type;
-    void *var;
+    bool *var;
 } KshFlag;
-
-typedef struct {
-    KshFlag *items;
-    size_t count;
-} KshFlags;
 
 struct KshParser;
 typedef int (*KshCommandFn)(struct KshParser *p);
@@ -79,18 +74,19 @@ typedef struct {
     KshCommandFn fn;
 } KshSubcmd;
 
+KSH_ARR(KshParam);
+KSH_ARR(KshFlag);
+KSH_ARR(KshSubcmd);
 typedef struct {
-    KshSubcmd *items;
-    size_t count;
-} KshSubcmds;
-
-typedef struct KshParser {
-    KshLexer lex;
     KshParams params;
     KshFlags flags;
     KshSubcmds subcmds;
+    const char *help;
+} KshArgs;
+
+typedef struct KshParser {
+    KshLexer lex;
     KshErr err;
-    KshCommandFn root;
 } KshParser;
 
 #define KSH_PARAMS(...)  (KshParams){ (KshParam[]){__VA_ARGS__}, sizeof((KshParam[]){__VA_ARGS__})/sizeof(KshParam) }
@@ -118,9 +114,9 @@ typedef struct KshParser {
     StrView*: sizeof(StrView),          \
     default: sizeof(var))               \
 
-void ksh_init_from_strv(KshParser *p, StrView strv);
-void ksh_init_from_cargs(KshParser *p, int argc, char **argv);
-bool ksh_parse_cmd(KshParser *p, KshCommandFn root_fn);
-void ksh_parse_args(KshParser *p);
+void ksh_parse_args(KshParser *p, KshArgs *args);
+
+bool ksh_parse_strv(StrView strv, KshCommandFn root_fn);
+bool ksh_parse_cargs(int argc, char **argv, KshCommandFn root_fn);
 
 #endif

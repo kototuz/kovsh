@@ -3,31 +3,18 @@
 
 static int main2(KshParser *p)
 {
-    StrView m = STRV_LIT("hello");
-    StrView c = STRV_LIT("\033[31m");
-    p->params = KSH_PARAMS(
-        KSH_PARAM_O(m, "message"),
-        KSH_PARAM_O(c, "color")
-    );
-    ksh_parse_args(p);
+    StrView m;
+    ksh_parse_args(p, &(KshArgs){
+        .params = KSH_PARAMS(KSH_PARAM(m, "message")),
+        .help = "a simple terminal written in C and powered by KOVSH",
+    });
 
-    if (strv_eq(c, STRV_LIT("green"))) {
-        c = STRV_LIT("\033[32m");
-    } else if (strv_eq(c, STRV_LIT("red"))) {
-        c = STRV_LIT("\033[31m");
-    }
-
-    printf(STRV_FMT""STRV_FMT"\n",
-           STRV_ARG(c),
-           STRV_ARG(m));
-
+    printf(STRV_FMT"\n", STRV_ARG(m));
     return 0;
 }
 
 int main(int argc, char **argv)
 {
-    KshParser p = {0};
-    ksh_init_from_cargs(&p, argc, argv);
-    ksh_parse_cmd(&p, main2);
+    ksh_parse_cargs(argc, argv, main2);
     return 0;
 }

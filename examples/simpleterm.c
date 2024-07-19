@@ -40,10 +40,45 @@ static int print(KshParser *parser)
     return 0;
 }
 
-static int root(KshParser *parser)
+static int root(Lexer *l)
 {
-    parser->flags = KSH_FLAGS(KSH_HELP("a simple terminal powered by KOVSH"));
-    parser->subcmds = KSH_SUBCMDS(KSH_SUBCMD(print, "a printer"));
+    StrView m;
+    int n;
+    bool yes;
+    ksh_parse_args(l, KSH_ARGS(
+        KSH_PARAMS(
+            KSH_PARAM(m, "msg"),
+            KSH_PARAM(n, "count")
+        ),
+        KSH_FLAGS(
+            KSH_FLAG(yes, "yes?"),
+            KSH_HELP("maybe what you want")
+        ),
+        KSH_SUBCMDS(
+            KSH_SUBCMD(print, "printer"),
+        )
+    ));
+
+    ksh_params = (KshParam[]){
+        KSH_PARAM(s, "string"),
+        KSH_PARAM()
+    };
+
+    ksh_parse_args(l,
+        KSH_PARAMS(KSH_PARAM(m, "message")),
+        KSH_OPT_PARAMS(KSH_STORE(m, ))
+        KSH_FLAGS(KSH_FLAG(yes, "yes?")),
+        KSH_SUBCMDS(KSH_SUBCMD(print, "printer")),
+        KSH_HELP("privet men"),
+        KSH_VERSION("0.0.1")
+    );
+
+    ksh_parse_args(
+        KSH_PARAMS(
+            KSH_PARAM(m, "message"),
+            KSH_PARAM(n, "count"),
+        )
+    );
 
     ksh_parse_args(parser);
     return 0;
@@ -57,8 +92,7 @@ int main(void)
     printf(">>> ");
     while (fgets(buf, sizeof(buf), stdin)) {
         if (strcmp(buf, "q\n") == 0) return 0;
-        ksh_init_from_strv(&parser, strv_from_str(buf));
-        ksh_parse_cmd(&parser, root);
+        ksh_parse_strv(strv_from_str(buf), root);
         printf(">>> ");
     }
 
