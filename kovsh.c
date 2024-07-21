@@ -7,6 +7,7 @@
 
 typedef enum {
     KSH_ARG_KIND_PARAM,
+    KSH_ARG_KIND_OPT_PARAM,
     KSH_ARG_KIND_FLAG,
     KSH_ARG_KIND_SUBCMD,
     KSH_ARG_KIND_HELP
@@ -128,12 +129,18 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
         KshArg *arg = args_find_arg(((Bytes*)args)[arg_kind],
                                     item_size,
                                     arg_name);
+
         if (!arg) {
-            sprintf(p->err,
-                    "%s `"STRV_FMT"` not found",
+            if (
+                arg_kind != KSH_ARG_KIND_PARAM ||
+                (arg = args_find_arg(((Bytes*)args)[KSH_ARG_KIND_OPT_PARAM], item_size, arg_name)) == NULL
+            ) {
+                sprintf(p->err,
+                        "%s `"STRV_FMT"` not found",
                         arg_kind_str[arg_kind],
-                    STRV_ARG(arg_name));
-            longjmp(ksh_exit, KSH_EXIT_ERR);
+                        STRV_ARG(arg_name));
+                longjmp(ksh_exit, KSH_EXIT_ERR);
+            }
         }
 
         switch (arg_kind) {
@@ -148,6 +155,16 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
             longjmp(ksh_exit, KSH_EXIT_EARLY);
             break;
         default: assert(0 && "unreachable");
+        }
+    }
+
+    KshParams params = args->params;
+    for (size_t i = 0; i < params.count; i++) {
+        if (params.items[i].var != NULL) {
+            sprintf(p->err,
+                    "parameter `"STRV_FMT"` must be assigned",
+                    STRV_ARG(params.items[i].base.name));
+            longjmp(ksh_exit, KSH_EXIT_ERR);
         }
     }
 }
@@ -263,6 +280,8 @@ static void parse_param_val(KshParam *self, KshParser *p)
         ksh_lex_next(&p->lex, &val)    &&
         val.items[0] != '-' 
     );
+
+    self->var = NULL;
 }
 
 static KshArgKind parse_arg_name(StrView *an, size_t *item_size)

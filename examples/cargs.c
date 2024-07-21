@@ -3,9 +3,9 @@
 
 static int main2(KshParser *p)
 {
-    StrView m;
+    StrView m = STRV_LIT("hello");
     ksh_parse_args(p, &(KshArgs){
-        .params = KSH_PARAMS(KSH_PARAM(m, "message")),
+        .opt_params = KSH_PARAMS(KSH_PARAM(m, "message")),
         .help = "a simple print command powered by KOVSH",
     });
 

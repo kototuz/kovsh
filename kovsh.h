@@ -90,6 +90,7 @@ KSH_ARR(KshFlag);
 KSH_ARR(KshSubcmd);
 typedef struct {
     KshParams params;
+    KshParams opt_params;
     KshFlags flags;
     KshSubcmds subcmds;
     const char *help;
