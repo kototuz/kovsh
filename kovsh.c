@@ -380,7 +380,7 @@ static void print_help(const char *descr, KshArgs args)
 
 static void print_param_usage(KshParam p)
 {
-    printf("-%s %-10s%s\n",
+    printf("+%s %-10s%s\n",
            p.base.name.items,
            param_types[p.type].tostr,
            p.base.usage);
