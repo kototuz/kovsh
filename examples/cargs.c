@@ -6,7 +6,7 @@ static int main2(KshParser *p)
     StrView m;
     ksh_parse_args(p, &(KshArgs){
         .params = KSH_PARAMS(KSH_PARAM(m, "message")),
-        .help = "a simple terminal written in C and powered by KOVSH",
+        .help = "a simple print command powered by KOVSH",
     });
 
     printf(STRV_FMT"\n", STRV_ARG(m));
@@ -15,6 +15,9 @@ static int main2(KshParser *p)
 
 int main(int argc, char **argv)
 {
-    ksh_parse_cargs(argc, argv, main2);
+    KshParser p;
+    ksh_init_from_cargs(&p, argc, argv);
+    ksh_parse(&p, main2);
+
     return 0;
 }

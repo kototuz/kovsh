@@ -32,10 +32,27 @@ StrView strv_from_str(const char *str);
 StrView strv_new(const char *data, size_t data_len);
 bool    strv_eq(StrView sv1, StrView sv2);
 
+typedef enum {
+    KSH_LEXER_TAG_CARGS,
+    KSH_LEXER_TAG_STRV
+} KshLexerTag;
+
+typedef enum {
+    KSH_LEXER_KIND_CSTR,
+    KSH_LEXER_KIND_CARGS
+} KshLexerKind;
+
+typedef union {
+    char *as_cstr;
+    struct {
+        int argc;
+        char **argv;
+    } as_cargs;
+} KshLexerSource;
+
 typedef struct {
-    StrView text;
-    StrView buf;
-    bool cargs;
+    KshLexerSource src;
+    KshLexerKind kind;
 } KshLexer;
 
 typedef struct {
@@ -110,7 +127,8 @@ typedef struct KshParser {
 
 void ksh_parse_args(KshParser *p, KshArgs *args);
 
-bool ksh_parse_strv(StrView strv, KshCommandFn root_fn);
-bool ksh_parse_cargs(int argc, char **argv, KshCommandFn root_fn);
+void ksh_init_from_cstr(KshParser *p, char *cstr);
+void ksh_init_from_cargs(KshParser *p, int argc, char **argv);
+bool ksh_parse(KshParser *p, KshCommandFn root_cmd);
 
 #endif

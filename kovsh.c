@@ -9,6 +9,7 @@ typedef enum {
     KSH_ARG_KIND_PARAM,
     KSH_ARG_KIND_FLAG,
     KSH_ARG_KIND_SUBCMD,
+    KSH_ARG_KIND_HELP
 } KshArgKind;
 
 typedef enum {
@@ -27,23 +28,23 @@ typedef struct {
     ParamParser parser;
 } KshParamTypeInfo;
 
-
-
 // TODO: refactor the lexer
 static bool ksh_lex_peek(KshLexer *l, StrView *res);
 static bool ksh_lex_next(KshLexer *l, StrView *res);
+static bool lex_str_peek(char **data, StrView *res);
 
 static bool isstr(int s);
 static bool isend(int s);
 static bool isbound(int s);
 
 static KshArg *args_find_arg(Bytes arr, size_t it_size, StrView name);
-
 static void parse_param_val(KshParam *param, KshParser *p);
+static KshArgKind parse_arg_name(StrView *an, size_t *item_size);
 
 static bool str_parser(Token t, StrView *re, size_t idx);
 static bool int_parser(Token t, int *res, size_t idx);
 static bool float_parser(Token t, float *res, size_t idx);
+
 
 static void print_help(const char *descr, KshArgs args);
 static void print_param_usage(KshParam p);
@@ -66,8 +67,6 @@ static const char *arg_kind_str[] = {
     [KSH_ARG_KIND_SUBCMD] = "subcommand"
 };
 
-
-
 StrView strv_new(const char *data, size_t data_len)
 {
     assert(strlen(data) >= data_len);
@@ -85,84 +84,54 @@ bool strv_eq(StrView sv1, StrView sv2)
            (memcmp(sv1.items, sv2.items, sv1.len) == 0);
 }
 
-
-
-bool ksh_parse_strv(StrView strv, KshCommandFn root_fn)
+void ksh_init_from_cstr(KshParser *p, char *cstr)
 {
-    KshParser p = { .lex.text = strv };
-
-    switch (setjmp(ksh_exit)) {
-    case KSH_EXIT_ERR:
-        fprintf(stderr, "ERROR: %s\n", p.err);
-        return false;
-    case KSH_EXIT_EARLY: return true;
-    default: break;
-    }
-
-    root_fn(&p);
-
-    return true;
+    p->lex.kind = KSH_LEXER_KIND_CSTR;
+    p->lex.src.as_cstr = cstr;
 }
 
-bool ksh_parse_cargs(int argc, char **argv, KshCommandFn root_fn)
+void ksh_init_from_cargs(KshParser *p, int argc, char **argv)
 {
-    argv++;
+    p->lex.kind = KSH_LEXER_KIND_CARGS;
     argc--;
-    KshParser p = {
-        .lex.text.items = (char*)argv,
-        .lex.text.len = argc,
-        .lex.cargs = true
-    };
+    argv++;
+    p->lex.src.as_cargs.argc = argc;
+    p->lex.src.as_cargs.argv = argv;
+}
 
+bool ksh_parse(KshParser *p, KshCommandFn root_cmd)
+{
     switch (setjmp(ksh_exit)) {
-    case KSH_EXIT_ERR:
-        fprintf(stderr, "ERROR: %s\n", p.err);
-        return false;
     case KSH_EXIT_EARLY: return true;
+    case KSH_EXIT_ERR:
+        fprintf(stderr, "ERROR: %s\n", p->err);
+        return false;
     default: break;
     }
 
-    root_fn(&p);
+    root_cmd(p);
 
     return true;
 }
 
 void ksh_parse_args(KshParser *p, KshArgs *args)
 {
-    StrView value;
     StrView arg_name;
-    KshArgKind arg_kind;
-    KshArg *arg;
-    Bytes grp;
-
     while (ksh_lex_next(&p->lex, &arg_name)) {
-        if (arg_name.items[0] == '-') {
-            arg_name.items += 1;
-            arg_name.len -= 1;
-            if (ksh_lex_peek(&p->lex, &value) && value.items[0] != '-') {
-                memcpy(&grp, &args->params, sizeof(KshParams));
-                arg = args_find_arg(grp, sizeof(KshParam), arg_name);
-                arg_kind = KSH_ARG_KIND_PARAM;
-            } else {
-                if (strv_eq(arg_name, STRV_LIT("help"))) {
-                    print_help(args->help, *args);
-                    longjmp(ksh_exit, KSH_EXIT_EARLY);
-                }
-
-                memcpy(&grp, &args->flags, sizeof(KshFlags));
-                arg = args_find_arg(grp, sizeof(KshFlag), arg_name);
-                arg_kind = KSH_ARG_KIND_FLAG;
-            }
-        } else {
-            memcpy(&grp, &args->subcmds, sizeof(KshSubcmds));
-            arg = args_find_arg(grp, sizeof(KshSubcmd), arg_name);
-            arg_kind = KSH_ARG_KIND_SUBCMD;
+        size_t item_size;
+        KshArgKind arg_kind = parse_arg_name(&arg_name, &item_size);
+        if (arg_kind == KSH_ARG_KIND_HELP) {
+            print_help(args->help, *args);
+            longjmp(ksh_exit, KSH_EXIT_EARLY);
         }
 
+        KshArg *arg = args_find_arg(((Bytes*)args)[arg_kind],
+                                    item_size,
+                                    arg_name);
         if (!arg) {
             sprintf(p->err,
                     "%s `"STRV_FMT"` not found",
-                    arg_kind_str[arg_kind],
+                        arg_kind_str[arg_kind],
                     STRV_ARG(arg_name));
             longjmp(ksh_exit, KSH_EXIT_ERR);
         }
@@ -178,6 +147,7 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
             ((KshSubcmd*)arg)->fn(p);
             longjmp(ksh_exit, KSH_EXIT_EARLY);
             break;
+        default: assert(0 && "unreachable");
         }
     }
 }
@@ -186,60 +156,59 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
 
 static bool ksh_lex_peek(KshLexer *l, StrView *res)
 {
-    if (l->text.len == 0) return false;
-    if (l->buf.items) {
-        *res = l->buf;
+    KshLexerSource src = l->src;
+    switch (l->kind) {
+    case KSH_LEXER_KIND_CARGS:
+        if (src.as_cargs.argc == 0) return false;
+        res->items = *src.as_cargs.argv;
+        res->len = strlen(*src.as_cargs.argv);
         return true;
+    case KSH_LEXER_KIND_CSTR: return lex_str_peek(&l->src.as_cstr, res);
+    default: assert(0 && "unreachable");
     }
-
-    StrView text;
-    if (l->cargs) {
-        text.items = *(char **)l->text.items;
-        text.len = strlen(text.items);
-        l->buf = *res = text;
-    } else {
-        text = l->text;
-        if (isspace(*text.items)) {
-            text.len--;
-            while (isspace(*++text.items))
-                text.len--;
-        }
-        l->text.len = text.len;
-        l->text.items = text.items;
-        text.len = 0;
-
-        if (isend(*text.items)) return false;
-
-        if (isstr(*text.items)) {
-            int pairsymbol = *text.items;
-            while (text.items[++text.len] != pairsymbol)
-                if (isend(text.items[text.len])) return false;
-            text.len++;
-        } else
-            while (!isbound(text.items[++text.len]));
-
-        l->buf = *res = text;
-    }
-
-    return true;
 }
 
 static bool ksh_lex_next(KshLexer *l, StrView *res)
 {
-    bool ret = true;
-    if (l->buf.items) *res = l->buf;
-    else ret = ksh_lex_peek(l, res);
+    if (!ksh_lex_peek(l, res)) return false;
+    switch (l->kind) {
+    case KSH_LEXER_KIND_CARGS:
+        l->src.as_cargs.argv++;
+        l->src.as_cargs.argc--;
+        break;
+    case KSH_LEXER_KIND_CSTR:
+        l->src.as_cstr += res->len;
+        break;
+    }
+    
+    return true;
+}
 
-    if (l->cargs) {
-        l->text.items = (char*)((char**)l->text.items+1);
-        l->text.len--;
-    } else {
-        l->text.items += l->buf.len;
-        l->text.len -= l->buf.len;
+static bool lex_str_peek(char **data, StrView *res)
+{
+    char *text = *data;
+
+    if (isspace(*text)) {
+        while (isspace(*++text));
     }
 
-    l->buf = (StrView){0};
-    return ret;
+    *data = text;
+
+    if (isend(*text)) return false;
+
+    size_t res_len = 0;
+    if (isstr(*text)) {
+        int pair_s = *text;
+        while (text[++res_len] != pair_s)
+            if (isend(text[res_len])) return false;
+        res_len++;
+    } else {
+        while (!isbound(text[++res_len]));
+    }
+
+    res->items = text;
+    res->len = res_len;
+    return true;
 }
 
 static bool isstr(int s)
@@ -295,6 +264,27 @@ static void parse_param_val(KshParam *self, KshParser *p)
         ksh_lex_next(&p->lex, &val)    &&
         val.items[0] != '-' 
     );
+}
+
+static KshArgKind parse_arg_name(StrView *an, size_t *item_size)
+{
+    switch (an->items[0]) {
+    case '-':
+        if (strncmp(&an->items[1], "help", 4) == 0) {
+            return KSH_ARG_KIND_HELP;
+        }
+
+        an->items++;
+        an->len--;
+        *item_size = sizeof(KshFlag);
+        return KSH_ARG_KIND_FLAG;
+    case '+':
+        an->items++;
+        an->len--;
+        *item_size = sizeof(KshParam);
+        return KSH_ARG_KIND_PARAM;
+    default: return KSH_ARG_KIND_SUBCMD;
+    }
 }
 
 static bool str_parser(Token t, StrView *res, size_t idx)
