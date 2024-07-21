@@ -258,7 +258,6 @@ static void parse_param_val(KshParam *self, KshParser *p)
                     pt_info.tostr);
             longjmp(ksh_exit, KSH_EXIT_ERR);
         }
-        self->assigned = true;
     } while (
         count-- != 0                   &&
         ksh_lex_next(&p->lex, &val)    &&
