@@ -3,13 +3,13 @@
 
 static int main2(KshParser *p)
 {
-    StrView m = STRV_LIT("hello");
+    char m[10];
     ksh_parse_args(p, &(KshArgs){
         .opt_params = KSH_PARAMS(KSH_PARAM(m, "message")),
         .help = "a simple print command powered by KOVSH",
     });
 
-    printf(STRV_FMT"\n", STRV_ARG(m));
+    printf("Your message is: %s\n", m);
     return 0;
 }
 

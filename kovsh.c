@@ -260,15 +260,24 @@ static KshArg *args_find_arg(Bytes arr, size_t it_size, StrView name)
 static void parse_param_val(KshParam *self, KshParser *p)
 {
     StrView val;
+    size_t max;
+
     if (!ksh_lex_next(&p->lex, &val)) {
         sprintf(p->err, "at least 1 param is required");
         longjmp(ksh_exit, KSH_EXIT_ERR);
     }
 
+    if (self->type == KSH_PARAM_TYPE_CSTR) {
+        max = self->max;
+        strncpy(self->var, val.items,
+                max > val.len ? val.len : max);
+        return;
+    }
+
     KshParamTypeInfo pt_info = param_types[self->type];
-    size_t count = self->max-1;
+    max = self->max-1;
     do {
-        if (!pt_info.parser(val, self->var, count)) {
+        if (!pt_info.parser(val, self->var, max)) {
             sprintf(p->err,
                     "`"STRV_FMT"` is not a %s",
                     STRV_ARG(val),
@@ -276,7 +285,7 @@ static void parse_param_val(KshParam *self, KshParser *p)
             longjmp(ksh_exit, KSH_EXIT_ERR);
         }
     } while (
-        count-- != 0                   &&
+        max-- != 0                   &&
         ksh_lex_next(&p->lex, &val)    &&
         val.items[0] != '-' 
     );

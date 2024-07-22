@@ -62,6 +62,7 @@ typedef struct {
 
 typedef enum {
     KSH_PARAM_TYPE_STR,
+    KSH_PARAM_TYPE_CSTR,
     KSH_PARAM_TYPE_INT,
     KSH_PARAM_TYPE_FLOAT,
 } KshParamType;
@@ -115,6 +116,7 @@ typedef struct KshParser {
 #define KSH_PARAM_TYPE(var) _Generic(var, \
     StrView:  KSH_PARAM_TYPE_STR,         \
     StrView*: KSH_PARAM_TYPE_STR,         \
+    char*:    KSH_PARAM_TYPE_CSTR,        \
     int:      KSH_PARAM_TYPE_INT,         \
     int*:     KSH_PARAM_TYPE_INT,         \
     float:    KSH_PARAM_TYPE_FLOAT,       \
@@ -123,6 +125,7 @@ typedef struct KshParser {
 #define KSH_TYPESIZE(var) _Generic(var, \
     int*: sizeof(int),                  \
     StrView*: sizeof(StrView),          \
+    char*: sizeof(char),                \
     default: sizeof(var))               \
 
 void ksh_parse_args(KshParser *p, KshArgs *args);
