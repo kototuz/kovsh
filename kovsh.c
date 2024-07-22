@@ -110,7 +110,7 @@ bool ksh_parse(KshParser *p, KshCommandFn root_cmd)
     default: break;
     }
 
-    root_cmd(p);
+    p->cmd_exit_code = root_cmd(p);
 
     return true;
 }
@@ -151,7 +151,7 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
             *((KshFlag*)arg)->var = true;
             break;
         case KSH_ARG_KIND_SUBCMD:
-            ((KshSubcmd*)arg)->fn(p);
+            p->cmd_exit_code = ((KshSubcmd*)arg)->fn(p);
             longjmp(ksh_exit, KSH_EXIT_EARLY);
             break;
         default: assert(0 && "unreachable");

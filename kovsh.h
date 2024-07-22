@@ -100,6 +100,7 @@ typedef struct {
 typedef struct KshParser {
     KshLexer lex;
     KshErr err;
+    int cmd_exit_code;
 } KshParser;
 
 #define KSH_PARAMS(...)  (KshParams){ (KshParam[]){__VA_ARGS__}, sizeof((KshParam[]){__VA_ARGS__})/sizeof(KshParam) }
