@@ -64,10 +64,13 @@ static const KshParamTypeInfo param_types[] = {
     [KSH_PARAM_TYPE_FLOAT] = { "<float>", (ParamParser) float_parser }
 };
 
-static const char *arg_kind_str[] = {
-    [KSH_ARG_KIND_PARAM]  = "parameter",
-    [KSH_ARG_KIND_FLAG]   = "flag",
-    [KSH_ARG_KIND_SUBCMD] = "subcommand"
+static const struct {
+    const char *name;
+    size_t size;
+} arg_group[] = {
+    [KSH_ARG_KIND_PARAM]  = { "parameter", 2 },
+    [KSH_ARG_KIND_FLAG]   = { "flag", 2 },
+    [KSH_ARG_KIND_SUBCMD] = { "subcommand", 1 }
 };
 
 static const size_t arg_struct_size[] = {
@@ -77,13 +80,6 @@ static const size_t arg_struct_size[] = {
     [KSH_ARG_KIND_CHOICE]    = sizeof(KshChoice),
     [KSH_ARG_KIND_SUBCMD]    = sizeof(KshSubcmd),
 };
-
-static const size_t arg_group_size[] = {
-    [KSH_ARG_KIND_PARAM]  = 2,
-    [KSH_ARG_KIND_FLAG]   = 2,
-    [KSH_ARG_KIND_SUBCMD] = 1
-};
-
 
 
 StrView strv_new(const char *data, size_t data_len)
@@ -147,7 +143,7 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
         if (!arg) {
             sprintf(p->err,
                     "%s `"STRV_FMT"` not found",
-                    arg_kind_str[arg_kind],
+                    arg_group[arg_kind].name,
                     STRV_ARG(arg_name));
             longjmp(ksh_exit, KSH_EXIT_ERR);
         }
@@ -265,7 +261,7 @@ static bool isbound(int s)
 static KshArg *find_arg(Bytes *args, Token t, KshArgKind *result_kind)
 {
     KshArgKind begin = arg_actual(&t);
-    KshArgKind end = begin + arg_group_size[begin];
+    KshArgKind end = begin + arg_group[begin].size;
 
     *result_kind = begin;
 
