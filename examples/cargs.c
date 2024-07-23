@@ -2,14 +2,21 @@
 #include "../kovsh.h"
 
 static int stuf(KshParser *p) {
+    bool cute = false;
     int num;
     ksh_parse_args(p, &(KshArgs){
-        .params = KSH_PARAMS(KSH_PARAM(num, "a number"))
+        .params = KSH_PARAMS(KSH_PARAM(num, "a number")),
+        .flags = KSH_FLAGS(KSH_FLAG(cute, "cute?"))
     });
 
     if (num < 10) return 1;
 
-    puts("Oh your the best");
+    if (cute) {
+        puts("<<HELLO>>");
+    } else {
+        puts("hello");
+    }
+
     return 0;
 }
 

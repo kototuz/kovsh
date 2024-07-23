@@ -110,7 +110,7 @@ typedef struct KshParser {
 #define KSH_PARAM(var, usage)  { { STRV_LIT(#var), usage }, KSH_PARAM_TYPE(var), sizeof(var)/(KSH_TYPESIZE(var)), &var }
 #define KSH_PARAM_O(var, usage) { { STRV_LIT(#var), usage }, KSH_PARAM_TYPE(var), sizeof(var)/(KSH_TYPESIZE(var)), &var }
 
-#define KSH_FLAG(var, usage) { { STRV_LIT(#var), usage }, KSH_FLAG_TYPE_STORE_BOOL, &var }
+#define KSH_FLAG(var, usage) { { STRV_LIT(#var), usage }, &var }
 
 #define KSH_SUBCMD(fn, descr) { { STRV_LIT(#fn), descr }, fn }
 
