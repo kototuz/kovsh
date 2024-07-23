@@ -362,6 +362,7 @@ static bool float_parser(Token t, float *res, size_t idx)
     return true;
 }
 
+// TODO: remove descr. It exists in args
 static void print_help(const char *descr, KshArgs args)
 {
     size_t ctr;
