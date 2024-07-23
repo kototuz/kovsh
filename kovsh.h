@@ -86,6 +86,8 @@ typedef struct {
     KshCommandFn fn;
 } KshSubcmd;
 
+// Flag kind args => `-`
+// Param kind args => `+`
 KSH_ARR(KshParam);
 KSH_ARR(KshFlag);
 KSH_ARR(KshSubcmd);

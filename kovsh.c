@@ -10,7 +10,6 @@ typedef enum {
     KSH_ARG_KIND_OPT_PARAM,
     KSH_ARG_KIND_FLAG,
     KSH_ARG_KIND_SUBCMD,
-    KSH_ARG_KIND_HELP
 } KshArgKind;
 
 typedef enum {
@@ -38,10 +37,10 @@ static bool isstr(int s);
 static bool isend(int s);
 static bool isbound(int s);
 
-static KshArg *args_find_arg(Bytes arr, size_t it_size, StrView name);
-static void parse_param_val(KshParam *param, KshParser *p);
-static KshArgKind parse_arg_name(StrView *an, size_t *item_size);
+static KshArg *find_arg(Bytes *args, Token t, KshArgKind *result_kind);
+static KshArgKind arg_actual(Token *arg);
 
+static void parse_param_val(KshParam *param, KshParser *p);
 static bool str_parser(Token t, StrView *re, size_t idx);
 static bool int_parser(Token t, int *res, size_t idx);
 static bool float_parser(Token t, float *res, size_t idx);
@@ -67,6 +66,21 @@ static const char *arg_kind_str[] = {
     [KSH_ARG_KIND_FLAG]   = "flag",
     [KSH_ARG_KIND_SUBCMD] = "subcommand"
 };
+
+static const size_t arg_struct_size[] = {
+    [KSH_ARG_KIND_PARAM]     = sizeof(KshParam),
+    [KSH_ARG_KIND_OPT_PARAM] = sizeof(KshParam),
+    [KSH_ARG_KIND_FLAG]      = sizeof(KshFlag),
+    [KSH_ARG_KIND_SUBCMD]    = sizeof(KshSubcmd),
+};
+
+static const size_t arg_group_size[] = {
+    [KSH_ARG_KIND_PARAM]  = 2,
+    [KSH_ARG_KIND_FLAG]   = 1,
+    [KSH_ARG_KIND_SUBCMD] = 1
+};
+
+
 
 StrView strv_new(const char *data, size_t data_len)
 {
@@ -119,31 +133,23 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
 {
     StrView arg_name;
     while (ksh_lex_next(&p->lex, &arg_name)) {
-        size_t item_size;
-        KshArgKind arg_kind = parse_arg_name(&arg_name, &item_size);
-        if (arg_kind == KSH_ARG_KIND_HELP) {
+        if (strncmp(arg_name.items, "-help", 5) == 0) {
             print_help(args->help, *args);
             longjmp(ksh_exit, KSH_EXIT_EARLY);
         }
 
-        KshArg *arg = args_find_arg(((Bytes*)args)[arg_kind],
-                                    item_size,
-                                    arg_name);
-
+        KshArgKind arg_kind;
+        KshArg *arg = find_arg((Bytes*)args, arg_name, &arg_kind);
         if (!arg) {
-            if (
-                arg_kind != KSH_ARG_KIND_PARAM ||
-                (arg = args_find_arg(((Bytes*)args)[KSH_ARG_KIND_OPT_PARAM], item_size, arg_name)) == NULL
-            ) {
-                sprintf(p->err,
-                        "%s `"STRV_FMT"` not found",
-                        arg_kind_str[arg_kind],
-                        STRV_ARG(arg_name));
-                longjmp(ksh_exit, KSH_EXIT_ERR);
-            }
+            sprintf(p->err,
+                    "%s `"STRV_FMT"` not found",
+                    arg_kind_str[arg_kind],
+                    STRV_ARG(arg_name));
+            longjmp(ksh_exit, KSH_EXIT_ERR);
         }
 
         switch (arg_kind) {
+        case KSH_ARG_KIND_OPT_PARAM:
         case KSH_ARG_KIND_PARAM:
             parse_param_val((KshParam*)arg, p);
             break;
@@ -245,12 +251,22 @@ static bool isbound(int s)
            isend(s);
 }
 
-static KshArg *args_find_arg(Bytes arr, size_t it_size, StrView name)
+static KshArg *find_arg(Bytes *args, Token t, KshArgKind *result_kind)
 {
-    for (size_t i = 0; i < arr.count; i++) {
-        arr.items += i*it_size;
-        if (strv_eq(name, ((KshArg*)arr.items)->name)) {
-            return (KshArg*)arr.items;
+    KshArgKind begin = arg_actual(&t);
+    KshArgKind end = begin + arg_group_size[begin];
+
+    for (; begin <= end; begin++) {
+        Bytes bytes = args[begin];
+        size_t item_size = arg_struct_size[begin];
+        for (size_t i = 0;
+             i < bytes.count;
+             bytes.items += i++ * item_size)
+        {
+            if (strv_eq(t, ((KshArg*)bytes.items)->name)) {
+                *result_kind = begin;
+                return (KshArg*)bytes.items;
+            }
         }
     }
 
@@ -293,22 +309,16 @@ static void parse_param_val(KshParam *self, KshParser *p)
     self->var = NULL;
 }
 
-static KshArgKind parse_arg_name(StrView *an, size_t *item_size)
+static KshArgKind arg_actual(StrView *an)
 {
     switch (an->items[0]) {
     case '-':
-        if (strncmp(&an->items[1], "help", 4) == 0) {
-            return KSH_ARG_KIND_HELP;
-        }
-
         an->items++;
         an->len--;
-        *item_size = sizeof(KshFlag);
         return KSH_ARG_KIND_FLAG;
     case '+':
         an->items++;
         an->len--;
-        *item_size = sizeof(KshParam);
         return KSH_ARG_KIND_PARAM;
     default: return KSH_ARG_KIND_SUBCMD;
     }
