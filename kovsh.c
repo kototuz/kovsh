@@ -267,7 +267,9 @@ static KshArg *find_arg(Bytes *args, Token t, KshArgKind *result_kind)
     KshArgKind begin = arg_actual(&t);
     KshArgKind end = begin + arg_group_size[begin];
 
-    for (; begin <= end; begin++) {
+    *result_kind = begin;
+
+    for (; begin < end; begin++) {
         Bytes bytes = args[begin];
         size_t item_size = arg_struct_size[begin];
         for (; bytes.count > 0; bytes.count--, bytes.items += item_size)
