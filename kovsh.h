@@ -86,8 +86,16 @@ typedef struct {
     KshCommandFn fn;
 } KshSubcmd;
 
+// TODO: think about
+typedef struct {
+    KshArg base;
+    void *var;
+    int choice;
+} KshChoice;
+
 // Flag kind args => `-`
 // Param kind args => `+`
+KSH_ARR(KshChoice);
 KSH_ARR(KshParam);
 KSH_ARR(KshFlag);
 KSH_ARR(KshSubcmd);
@@ -95,6 +103,7 @@ typedef struct {
     KshParams params;
     KshParams opt_params;
     KshFlags flags;
+    KshChoices choices;
     KshSubcmds subcmds;
     const char *help;
 } KshArgs;
@@ -105,14 +114,18 @@ typedef struct KshParser {
     int cmd_exit_code;
 } KshParser;
 
+// TODO: refactor args names in macros
 #define KSH_PARAMS(...)  (KshParams){ (KshParam[]){__VA_ARGS__}, sizeof((KshParam[]){__VA_ARGS__})/sizeof(KshParam) }
 #define KSH_FLAGS(...)   (KshFlags){ (KshFlag[]){__VA_ARGS__}, sizeof((KshFlag[]){__VA_ARGS__})/sizeof(KshFlag) }
 #define KSH_SUBCMDS(...) (KshSubcmds){ (KshSubcmd[]){__VA_ARGS__}, sizeof((KshSubcmd[]){__VA_ARGS__})/sizeof(KshSubcmd) }
+#define KSH_CHOICES(...) (KshChoices){ (KshChoice[]){__VA_ARGS__}, sizeof((KshChoice[]){__VA_ARGS__})/sizeof(KshChoice) }
 
 #define KSH_PARAM(var, usage)  { { STRV_LIT(#var), usage }, KSH_PARAM_TYPE(var), sizeof(var)/(KSH_TYPESIZE(var)), &var }
 #define KSH_PARAM_O(var, usage) { { STRV_LIT(#var), usage }, KSH_PARAM_TYPE(var), sizeof(var)/(KSH_TYPESIZE(var)), &var }
 
 #define KSH_FLAG(var, usage) { { STRV_LIT(#var), usage }, &var }
+
+#define KSH_CHOICE(var, name, choice) { { STRV_LIT(name), "none" }, &var, choice }
 
 #define KSH_SUBCMD(fn, descr) { { STRV_LIT(#fn), descr }, fn }
 

@@ -8,7 +8,10 @@
 typedef enum {
     KSH_ARG_KIND_PARAM,
     KSH_ARG_KIND_OPT_PARAM,
+
     KSH_ARG_KIND_FLAG,
+    KSH_ARG_KIND_CHOICE,
+
     KSH_ARG_KIND_SUBCMD,
 } KshArgKind;
 
@@ -71,12 +74,13 @@ static const size_t arg_struct_size[] = {
     [KSH_ARG_KIND_PARAM]     = sizeof(KshParam),
     [KSH_ARG_KIND_OPT_PARAM] = sizeof(KshParam),
     [KSH_ARG_KIND_FLAG]      = sizeof(KshFlag),
+    [KSH_ARG_KIND_CHOICE]    = sizeof(KshChoice),
     [KSH_ARG_KIND_SUBCMD]    = sizeof(KshSubcmd),
 };
 
 static const size_t arg_group_size[] = {
     [KSH_ARG_KIND_PARAM]  = 2,
-    [KSH_ARG_KIND_FLAG]   = 1,
+    [KSH_ARG_KIND_FLAG]   = 2,
     [KSH_ARG_KIND_SUBCMD] = 1
 };
 
@@ -153,13 +157,20 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
         case KSH_ARG_KIND_PARAM:
             parse_param_val((KshParam*)arg, p);
             break;
+
         case KSH_ARG_KIND_FLAG:
             *((KshFlag*)arg)->var = true;
             break;
+
+        case KSH_ARG_KIND_CHOICE:
+            *(int*)((KshChoice*)arg)->var = ((KshChoice*)arg)->choice;
+            break;
+
         case KSH_ARG_KIND_SUBCMD:
             p->cmd_exit_code = ((KshSubcmd*)arg)->fn(p);
             longjmp(ksh_exit, KSH_EXIT_EARLY);
             break;
+
         default: assert(0 && "unreachable");
         }
     }
@@ -259,9 +270,7 @@ static KshArg *find_arg(Bytes *args, Token t, KshArgKind *result_kind)
     for (; begin <= end; begin++) {
         Bytes bytes = args[begin];
         size_t item_size = arg_struct_size[begin];
-        for (size_t i = 0;
-             i < bytes.count;
-             bytes.items += i++ * item_size)
+        for (; bytes.count > 0; bytes.count--, bytes.items += item_size)
         {
             if (strv_eq(t, ((KshArg*)bytes.items)->name)) {
                 *result_kind = begin;

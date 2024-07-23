@@ -4,17 +4,28 @@
 static int stuf(KshParser *p) {
     bool cute = false;
     int num;
+
+    enum {
+        RED,
+        GREEN,
+        BLUE
+    } color = 0;
+
     ksh_parse_args(p, &(KshArgs){
         .params = KSH_PARAMS(KSH_PARAM(num, "a number")),
-        .flags = KSH_FLAGS(KSH_FLAG(cute, "cute?"))
+        .flags = KSH_FLAGS(KSH_FLAG(cute, "cute?")),
+        .choices = KSH_CHOICES(
+            KSH_CHOICE(color, "red", RED),
+            KSH_CHOICE(color, "green", GREEN),
+            KSH_CHOICE(color, "blue", BLUE),
+        )
     });
 
-    if (num < 10) return 1;
-
-    if (cute) {
-        puts("<<HELLO>>");
-    } else {
-        puts("hello");
+    switch (color) {
+    case RED: puts("red"); break;
+    case GREEN: puts("green"); break;
+    case BLUE: puts("blue"); break;
+    default: assert(0 && "unreachable");
     }
 
     return 0;
