@@ -151,3 +151,5 @@ void ksh_init_from_cargs(KshParser *p, int argc, char **argv);
 bool ksh_parse(KshParser *p, KshCommandFn root_cmd);
 
 #endif
+
+// TODO: user error handling
