@@ -31,6 +31,8 @@ typedef struct {
     ParamParser parser;
 } KshParamTypeInfo;
 
+typedef bool (*EqFn)(void *arg, StrView name);
+
 // TODO: refactor the lexer
 static bool ksh_lex_peek(KshLexer *l, StrView *res);
 static bool ksh_lex_next(KshLexer *l, StrView *res);
@@ -42,6 +44,10 @@ static bool isbound(int s);
 
 static KshArg *find_arg(Bytes *args, Token t, KshArgKind *result_kind);
 static KshArgKind arg_actual(Token *arg);
+static EqFn arg_name_eq_fn(KshArgKind kind);
+
+static bool default_arg_name_eq(KshArg *arg, StrView name);
+static bool choice_arg_name_eq(KshChoice *arg, StrView name);
 
 static void parse_param_val(KshParam *param, KshParser *p);
 static bool str_parser(Token t, StrView *re, size_t idx);
@@ -158,9 +164,7 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
             *((KshFlag*)arg)->var = true;
             break;
 
-        case KSH_ARG_KIND_CHOICE:
-            *(int*)((KshChoice*)arg)->var = ((KshChoice*)arg)->choice;
-            break;
+        case KSH_ARG_KIND_CHOICE: break;
 
         case KSH_ARG_KIND_SUBCMD:
             p->cmd_exit_code = ((KshSubcmd*)arg)->fn(p);
@@ -267,10 +271,11 @@ static KshArg *find_arg(Bytes *args, Token t, KshArgKind *result_kind)
 
     for (; begin < end; begin++) {
         Bytes bytes = args[begin];
+        EqFn eq_fn = arg_name_eq_fn(begin);
         size_t item_size = arg_struct_size[begin];
         for (; bytes.count > 0; bytes.count--, bytes.items += item_size)
         {
-            if (strv_eq(t, ((KshArg*)bytes.items)->name)) {
+            if (eq_fn(bytes.items, t)) {
                 *result_kind = begin;
                 return (KshArg*)bytes.items;
             }
@@ -329,6 +334,33 @@ static KshArgKind arg_actual(StrView *an)
         return KSH_ARG_KIND_PARAM;
     default: return KSH_ARG_KIND_SUBCMD;
     }
+}
+
+static EqFn arg_name_eq_fn(KshArgKind kind)
+{
+    if (kind == KSH_ARG_KIND_CHOICE) {
+        return (EqFn)choice_arg_name_eq;
+    } else {
+        return (EqFn)default_arg_name_eq;
+    }
+}
+
+static bool default_arg_name_eq(KshArg *arg, StrView name)
+{
+    return strv_eq(name, arg->name);
+}
+
+static bool choice_arg_name_eq(KshChoice *arg, StrView name)
+{
+    const char **names = arg->names;
+    for (int i = 0; *names != NULL; names++, i++) {
+        if (strv_eq(name, strv_from_str(*names))) {
+            *(int*)arg->var = i;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static bool str_parser(Token t, StrView *res, size_t idx)

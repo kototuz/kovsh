@@ -88,9 +88,9 @@ typedef struct {
 
 // TODO: think about
 typedef struct {
-    KshArg base;
+    const char *usage;
     void *var;
-    int choice;
+    const char **names; // null terminated
 } KshChoice;
 
 // Flag kind args => `-`
@@ -125,7 +125,7 @@ typedef struct KshParser {
 
 #define KSH_FLAG(var, usage) { { STRV_LIT(#var), usage }, &var }
 
-#define KSH_CHOICE(var, name, choice) { { STRV_LIT(name), "none" }, &var, choice }
+#define KSH_CHOICE(var, usage, ...) { usage, &var, (const char *[]){__VA_ARGS__, NULL} }
 
 #define KSH_SUBCMD(fn, descr) { { STRV_LIT(#fn), descr }, fn }
 

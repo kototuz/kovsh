@@ -15,9 +15,7 @@ static int stuf(KshParser *p) {
         .params = KSH_PARAMS(KSH_PARAM(num, "a number")),
         .flags = KSH_FLAGS(KSH_FLAG(cute, "cute?")),
         .choices = KSH_CHOICES(
-            KSH_CHOICE(color, "red", RED),
-            KSH_CHOICE(color, "green", GREEN),
-            KSH_CHOICE(color, "blue", BLUE),
+            KSH_CHOICE(color, "color", "red", "green", "blue"),
         )
     });
 
