@@ -55,7 +55,7 @@ static bool int_parser(Token t, int *res, size_t idx);
 static bool float_parser(Token t, float *res, size_t idx);
 
 
-static void print_help(const char *descr, KshArgs args);
+static void print_help(KshArgs args);
 static void print_param_usage(KshParam p);
 static void print_flag_usage(KshFlag f);
 static void print_subcmd_usage(KshSubcmd s);
@@ -140,7 +140,7 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
     StrView arg_name;
     while (ksh_lex_next(&p->lex, &arg_name)) {
         if (strncmp(arg_name.items, "-help", 5) == 0) {
-            print_help(args->help, *args);
+            print_help(*args);
             longjmp(ksh_exit, KSH_EXIT_EARLY);
         }
 
@@ -411,8 +411,7 @@ static bool float_parser(Token t, float *res, size_t idx)
     return true;
 }
 
-// TODO: remove descr. It exists in args
-static void print_help(const char *descr, KshArgs args)
+static void print_help(KshArgs args)
 {
     size_t ctr;
     union {
@@ -421,7 +420,7 @@ static void print_help(const char *descr, KshArgs args)
         KshSubcmds as_ss;
     } grp;
 
-    printf("[description]\n   %s\n", descr);
+    printf("[description]\n   %s\n", args.help);
 
 
     grp.as_ps = args.params;
