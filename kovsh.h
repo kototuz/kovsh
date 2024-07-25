@@ -58,7 +58,7 @@ typedef struct {
 typedef struct {
     StrView name;
     const char *usage;
-} KshArg;
+} KshArgBase;
 
 typedef enum {
     KSH_PARAM_TYPE_STR,
@@ -68,21 +68,21 @@ typedef enum {
 } KshParamType;
 
 typedef struct {
-    KshArg base;
+    KshArgBase base;
     KshParamType type;
     size_t max;
     void *var;
 } KshParam;
 
 typedef struct {
-    KshArg base;
+    KshArgBase base;
     bool *var;
 } KshFlag;
 
 struct KshParser;
 typedef int (*KshCommandFn)(struct KshParser *p);
 typedef struct {
-    KshArg base;
+    KshArgBase base;
     KshCommandFn fn;
 } KshSubcmd;
 

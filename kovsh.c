@@ -20,6 +20,15 @@ typedef enum {
     KSH_EXIT_EARLY
 } KshExit;
 
+typedef union {
+    void *as_opaque;
+    KshArgBase *as_base;
+    KshParam *as_param;
+    KshFlag *as_flag;
+    KshChoice *as_choice;
+    KshSubcmd *as_subcmd;
+} KshArgPtr;
+
 typedef struct {
     uint8_t *items;
     size_t count;
@@ -42,11 +51,11 @@ static bool isstr(int s);
 static bool isend(int s);
 static bool isbound(int s);
 
-static KshArg *find_arg(Bytes *args, Token t, KshArgKind *result_kind);
+static KshArgPtr find_arg(Bytes *args, Token t, KshArgKind *result_kind);
 static KshArgKind arg_actual(Token *arg);
 static EqFn arg_name_eq_fn(KshArgKind kind);
 
-static bool default_arg_name_eq(KshArg *arg, StrView name);
+static bool default_arg_name_eq(KshArgBase *arg, StrView name);
 static bool choice_arg_name_eq(KshChoice *arg, StrView name);
 
 static void parse_param_val(KshParam *param, KshParser *p);
@@ -145,8 +154,8 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
         }
 
         KshArgKind arg_kind;
-        KshArg *arg = find_arg((Bytes*)args, arg_name, &arg_kind);
-        if (!arg) {
+        KshArgPtr arg = find_arg((Bytes*)args, arg_name, &arg_kind);
+        if (!arg.as_opaque) {
             sprintf(p->err,
                     "%s `"STRV_FMT"` not found",
                     arg_group[arg_kind].name,
@@ -157,17 +166,17 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
         switch (arg_kind) {
         case KSH_ARG_KIND_OPT_PARAM:
         case KSH_ARG_KIND_PARAM:
-            parse_param_val((KshParam*)arg, p);
+            parse_param_val(arg.as_param, p);
             break;
 
         case KSH_ARG_KIND_FLAG:
-            *((KshFlag*)arg)->var = true;
+            *arg.as_flag->var = true;
             break;
 
         case KSH_ARG_KIND_CHOICE: break;
 
         case KSH_ARG_KIND_SUBCMD:
-            p->cmd_exit_code = ((KshSubcmd*)arg)->fn(p);
+            p->cmd_exit_code = arg.as_subcmd->fn(p);
             longjmp(ksh_exit, KSH_EXIT_EARLY);
             break;
 
@@ -262,7 +271,7 @@ static bool isbound(int s)
            isend(s);
 }
 
-static KshArg *find_arg(Bytes *args, Token t, KshArgKind *result_kind)
+static KshArgPtr find_arg(Bytes *args, Token t, KshArgKind *result_kind)
 {
     KshArgKind begin = arg_actual(&t);
     KshArgKind end = begin + arg_group[begin].size;
@@ -277,12 +286,12 @@ static KshArg *find_arg(Bytes *args, Token t, KshArgKind *result_kind)
         {
             if (eq_fn(bytes.items, t)) {
                 *result_kind = begin;
-                return (KshArg*)bytes.items;
+                return (KshArgPtr){ .as_opaque = bytes.items };
             }
         }
     }
 
-    return NULL;
+    return (KshArgPtr){ .as_opaque = NULL };
 }
 
 static void parse_param_val(KshParam *self, KshParser *p)
@@ -345,7 +354,7 @@ static EqFn arg_name_eq_fn(KshArgKind kind)
     }
 }
 
-static bool default_arg_name_eq(KshArg *arg, StrView name)
+static bool default_arg_name_eq(KshArgBase *arg, StrView name)
 {
     return strv_eq(name, arg->name);
 }
