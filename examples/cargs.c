@@ -35,7 +35,7 @@ static int main2(KshParser *p)
     ksh_parse_args(p, &(KshArgs){
         .opt_params = KSH_PARAMS(KSH_PARAM(m, "message")),
         .help = "a simple print command powered by KOVSH",
-        .subcmds = KSH_SUBCMDS(KSH_SUBCMD(stuf, "stuf"))
+        .subcmds = KSH_SUBCMDS(KSH_SUBCMD(stuf, "stuff", "do some stuff"))
     });
 
     printf("Your message is: %s\n", m);

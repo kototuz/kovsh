@@ -114,7 +114,6 @@ typedef struct KshParser {
     int cmd_exit_code;
 } KshParser;
 
-// TODO: refactor args names in macros
 #define KSH_PARAMS(...)  (KshParams){ (KshParam[]){__VA_ARGS__}, sizeof((KshParam[]){__VA_ARGS__})/sizeof(KshParam) }
 #define KSH_FLAGS(...)   (KshFlags){ (KshFlag[]){__VA_ARGS__}, sizeof((KshFlag[]){__VA_ARGS__})/sizeof(KshFlag) }
 #define KSH_SUBCMDS(...) (KshSubcmds){ (KshSubcmd[]){__VA_ARGS__}, sizeof((KshSubcmd[]){__VA_ARGS__})/sizeof(KshSubcmd) }
@@ -122,12 +121,9 @@ typedef struct KshParser {
 
 #define KSH_PARAM(var, usage)  { { STRV_LIT(#var), usage }, KSH_PARAM_TYPE(var), sizeof(var)/(KSH_TYPESIZE(var)), &var }
 #define KSH_PARAM_O(var, usage) { { STRV_LIT(#var), usage }, KSH_PARAM_TYPE(var), sizeof(var)/(KSH_TYPESIZE(var)), &var }
-
 #define KSH_FLAG(var, usage) { { STRV_LIT(#var), usage }, &var }
-
 #define KSH_CHOICE(var, usage, ...) { usage, &var, (const char *[]){__VA_ARGS__, NULL} }
-
-#define KSH_SUBCMD(fn, descr) { { STRV_LIT(#fn), descr }, fn }
+#define KSH_SUBCMD(fn, name,  descr) { { STRV_LIT(name), descr }, fn }
 
 #define KSH_PARAM_TYPE(var) _Generic(var, \
     StrView:  KSH_PARAM_TYPE_STR,         \

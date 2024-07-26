@@ -21,7 +21,7 @@ static int root(KshParser *p)
 {
     ksh_parse_args(p, &(KshArgs){
         .help = "a simple terminal powered by KOVSH",
-        .subcmds = KSH_SUBCMDS(KSH_SUBCMD(print, "print"))
+        .subcmds = KSH_SUBCMDS(KSH_SUBCMD(print, "print", "printes messages"))
     });
 
     return 0;
