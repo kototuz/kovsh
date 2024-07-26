@@ -17,11 +17,20 @@ static int print(KshParser *p)
     return 0;
 }
 
+static int term_exit(KshParser *p)
+{
+    (void) p;
+    exit(0);
+}
+
 static int root(KshParser *p)
 {
     ksh_parse_args(p, &(KshArgs){
         .help = "a simple terminal powered by KOVSH",
-        .subcmds = KSH_SUBCMDS(KSH_SUBCMD(print, "print", "printes messages"))
+        .subcmds = KSH_SUBCMDS(
+            KSH_SUBCMD(print, "print", "printes messages"),
+            KSH_SUBCMD(term_exit, "exit", "exit from terminal")
+        )
     });
 
     return 0;
@@ -34,7 +43,6 @@ int main(void)
 
     printf(">>> ");
     while (fgets(buf, sizeof(buf), stdin)) {
-        if (strcmp(buf, "q\n") == 0) return 0;
         ksh_init_from_cstr(&parser, buf);
         ksh_parse(&parser, root);
         printf(">>> ");
