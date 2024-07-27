@@ -88,9 +88,9 @@ static void subcmd_help(KshSubcmd *self);
 
 static jmp_buf ksh_exit;
 
-// TODO: the string representation of `cstr`
-static const KshParamTypeInfo param_types[] = {
+static const KshParamTypeInfo param_type[] = {
     [KSH_PARAM_TYPE_STR]   = { "<str>", (ParamParser) str_parser },
+    [KSH_PARAM_TYPE_CSTR]  = { "<str>", NULL },
     [KSH_PARAM_TYPE_INT]   = { "<int>", (ParamParser) int_parser },
     [KSH_PARAM_TYPE_FLOAT] = { "<float>", (ParamParser) float_parser }
 };
@@ -327,7 +327,7 @@ static void parse_param_val(KshParam *self, KshParser *p)
         return;
     }
 
-    KshParamTypeInfo pt_info = param_types[self->type];
+    KshParamTypeInfo pt_info = param_type[self->type];
     max = self->max-1;
     do {
         if (!pt_info.parser(val, self->var, max)) {
@@ -464,7 +464,7 @@ static void param_help(KshParam *self)
 {
     printf("+"STRV_FMT" %-10s %s",
            STRV_ARG(self->base.name),
-           param_types[self->type].tostr,
+           param_type[self->type].tostr,
            self->base.usage);
 }
 
