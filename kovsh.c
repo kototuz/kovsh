@@ -13,6 +13,8 @@ typedef enum {
     KSH_ARG_KIND_CHOICE,
 
     KSH_ARG_KIND_SUBCMD,
+
+    KSH_ARG_KIND_COUNT
 } KshArgKind;
 
 typedef enum {
@@ -34,11 +36,23 @@ typedef struct {
     size_t count;
 } Bytes;
 
+typedef struct {
+    void *items;
+    size_t count;
+} KshArgGroup;
+
 typedef bool (*ParamParser)(Token t, void *res, size_t idx);
 typedef struct {
     const char *tostr;
     ParamParser parser;
 } KshParamTypeInfo;
+
+typedef void (*HelpFn)(void *self);
+typedef struct {
+    size_t struct_size;
+    HelpFn help_fn;
+    const char *str;
+} KshArgKindInfo;
 
 typedef bool (*EqFn)(void *arg, StrView name);
 
@@ -63,16 +77,18 @@ static bool str_parser(Token t, StrView *re, size_t idx);
 static bool int_parser(Token t, int *res, size_t idx);
 static bool float_parser(Token t, float *res, size_t idx);
 
-
-static void print_help(KshArgs args);
-static void print_param_usage(KshParam p);
-static void print_flag_usage(KshFlag f);
-static void print_subcmd_usage(KshSubcmd s);
+static void print_help(KshArgs *args);
+static void print_arg_usages(Bytes *groups);
+static void param_help(KshParam *self);
+static void flag_help(KshFlag *self);
+static void choice_help(KshChoice *self);
+static void subcmd_help(KshSubcmd *self);
 
 
 
 static jmp_buf ksh_exit;
 
+// TODO: the string representation of `cstr`
 static const KshParamTypeInfo param_types[] = {
     [KSH_PARAM_TYPE_STR]   = { "<str>", (ParamParser) str_parser },
     [KSH_PARAM_TYPE_INT]   = { "<int>", (ParamParser) int_parser },
@@ -88,14 +104,14 @@ static const struct {
     [KSH_ARG_KIND_SUBCMD] = { "subcommand", 1 }
 };
 
-static const size_t arg_struct_size[] = {
-    [KSH_ARG_KIND_PARAM]     = sizeof(KshParam),
-    [KSH_ARG_KIND_OPT_PARAM] = sizeof(KshParam),
-    [KSH_ARG_KIND_FLAG]      = sizeof(KshFlag),
-    [KSH_ARG_KIND_CHOICE]    = sizeof(KshChoice),
-    [KSH_ARG_KIND_SUBCMD]    = sizeof(KshSubcmd),
-};
 
+static const KshArgKindInfo arg_kind_info[] = {
+    [KSH_ARG_KIND_PARAM]     = { sizeof(KshParam),  (HelpFn) param_help, "parameter" },
+    [KSH_ARG_KIND_OPT_PARAM] = { sizeof(KshParam),  (HelpFn) param_help, "optional parameter" },
+    [KSH_ARG_KIND_FLAG]      = { sizeof(KshFlag),   (HelpFn) flag_help, "flag" },
+    [KSH_ARG_KIND_CHOICE]    = { sizeof(KshChoice), (HelpFn) choice_help, "choice" },
+    [KSH_ARG_KIND_SUBCMD]    = { sizeof(KshSubcmd), (HelpFn) subcmd_help, "subcommand" },
+};
 
 StrView strv_new(const char *data, size_t data_len)
 {
@@ -149,7 +165,7 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
     StrView arg_name;
     while (ksh_lex_next(&p->lex, &arg_name)) {
         if (strncmp(arg_name.items, "-help", 5) == 0) {
-            print_help(*args);
+            print_help(args);
             longjmp(ksh_exit, KSH_EXIT_EARLY);
         }
 
@@ -281,7 +297,7 @@ static KshArgPtr find_arg(Bytes *args, Token t, KshArgKind *result_kind)
     for (; begin < end; begin++) {
         Bytes bytes = args[begin];
         EqFn eq_fn = arg_name_eq_fn(begin);
-        size_t item_size = arg_struct_size[begin];
+        size_t item_size = arg_kind_info[begin].struct_size;
         for (; bytes.count > 0; bytes.count--, bytes.items += item_size)
         {
             if (eq_fn(bytes.items, t)) {
@@ -420,63 +436,61 @@ static bool float_parser(Token t, float *res, size_t idx)
     return true;
 }
 
-static void print_help(KshArgs args)
+static void print_help(KshArgs *args)
 {
-    size_t ctr;
-    union {
-        KshParams as_ps;
-        KshFlags as_fs;
-        KshSubcmds as_ss;
-    } grp;
+    printf("[descr]:\n   %s\n", args->help);
+    print_arg_usages((Bytes*)args);
+}
 
-    printf("[description]\n   %s\n", args.help);
-
-
-    grp.as_ps = args.params;
-    if (grp.as_ps.count > 0) {
-        putchar('\n');
-        printf("[parameters]\n");
-        for (ctr = 0; ctr < grp.as_ps.count; ctr++) {
-            printf("   ");
-            print_param_usage(grp.as_ps.items[ctr]);
+static void print_arg_usages(Bytes *groups)
+{
+    for (KshArgKind i = 0; i < KSH_ARG_KIND_COUNT; i++) {
+        Bytes group = groups[i];
+        KshArgKindInfo ak_info = arg_kind_info[i];
+        if (group.count == 0) continue;
+        printf("\n[%ss]", ak_info.str);
+        for (size_t y = 0;
+             y < group.count;
+             group.items += ++y * ak_info.struct_size)
+        {
+            printf("\n   ");
+            ak_info.help_fn(group.items);
         }
-    }
-
-    grp.as_fs = args.flags;
-    if (grp.as_fs.count > 0) {
         putchar('\n');
-        printf("[flags]\n");
-        for (ctr = 0; ctr < grp.as_fs.count; ctr++) {
-            printf("   ");
-            print_flag_usage(grp.as_fs.items[ctr]);
-        }
-    }
-
-    grp.as_ss = args.subcmds;
-    if (grp.as_ss.count > 0) {
-        putchar('\n');
-        printf("[subcmds]\n");
-        for (ctr = 0; ctr < grp.as_ss.count; ctr++) {
-            printf("   ");
-            print_subcmd_usage(grp.as_ss.items[ctr]);
-        }
     }
 }
 
-static void print_param_usage(KshParam p)
+static void param_help(KshParam *self)
 {
-    printf("+%s %-10s%s\n",
-           p.base.name.items,
-           param_types[p.type].tostr,
-           p.base.usage);
+    printf("+"STRV_FMT" %-10s %s",
+           STRV_ARG(self->base.name),
+           param_types[self->type].tostr,
+           self->base.usage);
 }
 
-static void print_flag_usage(KshFlag f)
+static void flag_help(KshFlag *self)
 {
-    printf("-%-12s%s\n", f.base.name.items, f.base.usage);
+    printf("%-10s %s",
+           self->base.name.items,
+           self->base.usage);
 }
 
-static void print_subcmd_usage(KshSubcmd s)
+static void choice_help(KshChoice *self)
 {
-    printf("%-13s%s\n", s.base.name.items, s.base.usage);
+    printf("-[");
+    const char **names = self->names;
+    assert(*names);
+    printf(*names++);
+    for (; *names != NULL; names++) {
+        putchar('|');
+        printf(*names);
+    }
+    printf("]\t%s", self->usage);
+}
+
+static void subcmd_help(KshSubcmd *self)
+{
+    printf("%-10s %s",
+           self->base.name.items,
+           self->base.usage);
 }
