@@ -88,6 +88,7 @@ static void subcmd_help(KshSubcmd *self);
 
 static jmp_buf ksh_exit;
 
+// TODO: maybe we need to leave only KSH_PARAM_TYPE_CSTR
 static const KshParamTypeInfo param_type[] = {
     [KSH_PARAM_TYPE_STR]   = { "<str>", (ParamParser) str_parser },
     [KSH_PARAM_TYPE_CSTR]  = { "<str>", NULL },
@@ -95,6 +96,7 @@ static const KshParamTypeInfo param_type[] = {
     [KSH_PARAM_TYPE_FLOAT] = { "<float>", (ParamParser) float_parser }
 };
 
+// TODO: remove the name. `arg_kind_info` already has it
 static const struct {
     const char *name;
     size_t size;
