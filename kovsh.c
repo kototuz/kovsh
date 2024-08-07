@@ -96,14 +96,10 @@ static const KshParamTypeInfo param_type[] = {
     [KSH_PARAM_TYPE_FLOAT] = { "<float>", (ParamParser) float_parser }
 };
 
-// TODO: remove the name. `arg_kind_info` already has it
-static const struct {
-    const char *name;
-    size_t size;
-} arg_group[] = {
-    [KSH_ARG_KIND_PARAM]  = { "parameter", 2 },
-    [KSH_ARG_KIND_FLAG]   = { "flag", 2 },
-    [KSH_ARG_KIND_SUBCMD] = { "subcommand", 1 }
+size_t arg_group_size[] = {
+    [KSH_ARG_KIND_PARAM]  =  2,
+    [KSH_ARG_KIND_FLAG]   =  2,
+    [KSH_ARG_KIND_SUBCMD] =  1 
 };
 
 
@@ -176,7 +172,7 @@ void ksh_parse_args(KshParser *p, KshArgs *args)
         if (!arg.as_opaque) {
             sprintf(p->err,
                     "%s `"STRV_FMT"` not found",
-                    arg_group[arg_kind].name,
+                    arg_kind_info[arg_kind].str,
                     STRV_ARG(arg_name));
             longjmp(ksh_exit, KSH_EXIT_ERR);
         }
@@ -292,7 +288,7 @@ static bool isbound(int s)
 static KshArgPtr find_arg(Bytes *args, Token t, KshArgKind *result_kind)
 {
     KshArgKind begin = arg_actual(&t);
-    KshArgKind end = begin + arg_group[begin].size;
+    KshArgKind end = begin + arg_group_size[begin];
 
     *result_kind = begin;
 
