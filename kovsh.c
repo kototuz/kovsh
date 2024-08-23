@@ -449,7 +449,7 @@ static void print_arg_usages(Bytes *groups)
         printf("\n[%ss]", ak_info.str);
         for (size_t y = 0;
              y < group.count;
-             group.items += ++y * ak_info.struct_size)
+             group.items += ak_info.struct_size, y++)
         {
             printf("\n   ");
             ak_info.help_fn(group.items);
